@@ -40,6 +40,22 @@ def discover_out_nodes(log: list[EventLog], dfg: list[tuple[tuple[str, str], int
 def my_apply_tree(log: list[EventLog], parameters):
     activity_key = exec_utils.get_param_value(Parameters.ACTIVITY_KEY, parameters,
                                               pmutil.xes_constants.DEFAULT_NAME_KEY)
+    '''DFG INIT'''
+    #Working with the first log
+    # log = log[0]
+    # dfg = [(k, v) for k, v in dfg_inst.apply(log, parameters=parameters).items() if v > 0]
+    # sender_nodes = discover_in_nodes(log, dfg)
+    # dfg.extend(sender_nodes)
+    dfg = {}
+    for index, trace in enumerate(log):
+        dfg[index] = [(k, v) for k, v in dfg_inst.apply(trace, parameters=parameters).items() if v > 0]
+    sender_nodes = discover_in_nodes(log, dfg, activity_key)
+    for index, key in enumerate(sender_nodes):
+        dfg[index].extend(sender_nodes[index])
+    # might be redundant, but will help matching senders with receivers, currently not implemented
+    #receiver_nodes = discover_out_nodes(log, dfg)
+    #for x in receiver_nodes:
+    #    dfg[trace].append(x)
 
     for index, trace in enumerate(log):
         # keep only the activity attribute (since the others are not used)
@@ -48,27 +64,15 @@ def my_apply_tree(log: list[EventLog], parameters):
     noise_threshold = exec_utils.get_param_value(Parameters.NOISE_THRESHOLD, parameters,
                                                  shared_constants.NOISE_THRESHOLD_IMF)
 
-    '''DFG INIT'''
-    log = log[0]
-    dfg = [(k, v) for k, v in dfg_inst.apply(log, parameters=parameters).items() if v > 0]
-    sender_nodes = discover_in_nodes(log, dfg)
-    dfg.extend(sender_nodes)
-    #dfg = {}
-    #for index, trace in enumerate(log):
-    #    dfg[trace] = [(k, v) for k, v in dfg_inst.apply(trace, parameters=parameters).items() if v > 0]
-    #sender_nodes = discover_in_nodes(log, dfg)
-    #for key in sender_nodes.keys():
-    #    dfg[key].append(sender_nodes[key])
-    # might be redundant, but will help matching senders with receivers, currently not implemented
-    #receiver_nodes = discover_out_nodes(log, dfg)
-    #for x in receiver_nodes:
-    #    dfg[trace].append(x)
+    sender_nodes_t = sender_nodes[0]
+    dfg_t = dfg[0]
+    log_t = log[0]
 
     c = Counts()
-    activities = attributes_get.get_attribute_values(log, activity_key)
-    start_activities = list(start_activities_get.get_start_activities(log, parameters=parameters).keys())
-    end_activities = list(end_activities_get.get_end_activities(log, parameters=parameters).keys())
-    for x in sender_nodes:
+    activities = attributes_get.get_attribute_values(log_t, activity_key)
+    start_activities = list(start_activities_get.get_start_activities(log_t, parameters=parameters).keys())
+    end_activities = list(end_activities_get.get_end_activities(log_t, parameters=parameters).keys())
+    for x in sender_nodes_t:
         activities[x[0][0]] = x[1]
         start_activities.append(x[0][0])
 
