@@ -20,19 +20,37 @@ from pm4py.util import exec_utils, xes_constants
 from pm4py.algo.discovery.inductive.variants.im.util.get_tree_repr_implain import get_transition
 
 
-def not_working_discover_in_nodes(log: list[EventLog], dfg: dict[EventLog, list[tuple[tuple[str, str], int]]]) -> \
-        dict[EventLog, list[tuple[tuple[str, str], int]]]:
+def discover_in_nodes(log: list[EventLog], dfg: dict[int, list[tuple[tuple[str, str], int]]], activity_key: str) -> \
+        dict[int, list[tuple[tuple[str, str], int]]]:
+
+    #discover receiving nodes
     sender_nodes = {}
-    sender_nodes[log[0]] = [(('PIPPO', 'Receive patient results'), 50)]
+    sender_nodes[0] = [(('PIPPO', 'Receive patient results'), 50)]
+    send_list = []
+    send_receive_dict = {}
+    for trace_list in log:
+        for trace in trace_list:
+            for event_1 in trace:
+                if 'msgType' in event_1.keys() and event_1['msgType'] == 'send' and event_1[activity_key] not in send_receive_dict.keys():
+                    for event_2 in trace:
+                        if 'msgType' in event_2.keys() and event_2['msgType'] == 'receive' and event_2[activity_key] not in send_receive_dict.keys():
+                            print(event_1['msgInstanceId'], event_2['msgInstanceId'])
+                            if event_1['msgInstanceId'] == event_2['msgInstanceId']:
+                                send_list.append((event_1, event_2))
+                                send_receive_dict[event_1[activity_key]] = True
+                                send_receive_dict[event_2[activity_key]] = True
+    for elem in send_list:
+        print(elem[0][activity_key], elem[1][activity_key])
     return sender_nodes
 
-
+"""
 def discover_in_nodes(log: EventLog, dfg: list[tuple[tuple[str, str], int]]) -> list[tuple[tuple[str, str], int]]:
     sender_nodes = [(('PIPPO', 'Receive patient results'), 50)]
     return sender_nodes
-
+"""
 
 def discover_out_nodes(log: list[EventLog], dfg: list[tuple[tuple[str, str], int]]):
+    #discover sender nodes
     receiver_nodes = []
     return receiver_nodes
 
@@ -77,20 +95,20 @@ def my_apply_tree(log: list[EventLog], parameters):
         start_activities.append(x[0][0])
 
     contains_empty_traces = False
-    traces_length = [len(trace) for trace in log]
+    traces_length = [len(trace) for trace in log_t]
     if traces_length:
-        contains_empty_traces = min([len(trace) for trace in log]) == 0
+        contains_empty_traces = min([len(trace) for trace in log_t]) == 0
 
     # set the threshold parameter based on f and the max value in the dfg:
     max_value = 0
-    for key, value in dfg:
+    for key, value in dfg_t:
         if value > max_value:
             max_value = value
     threshold = noise_threshold * max_value
 
     recursion_depth = 0
 
-    sub = my_subtree_infrequent.my_make_tree(sender_nodes, log, dfg, dfg, dfg, activities, c, recursion_depth, noise_threshold, threshold,
+    sub = my_subtree_infrequent.my_make_tree(sender_nodes_t, log_t, dfg_t, dfg_t, dfg_t, activities, c, recursion_depth, noise_threshold, threshold,
                             start_activities, end_activities,
                             start_activities, end_activities, parameters=parameters)
 
