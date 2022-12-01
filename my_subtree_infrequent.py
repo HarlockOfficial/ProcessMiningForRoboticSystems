@@ -23,7 +23,7 @@ from pm4py.algo.discovery.inductive.variants.im_f.data_structures.subtree_infreq
 
 
 class MySubtreeInfrequent(SubtreeInfrequent):
-    def __init__(self, sender_nodes, log, initial_log, dfg, master_dfg, initial_dfg, activities, counts, rec_depth, f=0, noise_threshold=0,
+    def __init__(self, sender_nodes, receiver_nodes, log, initial_log, dfg, master_dfg, initial_dfg, activities, counts, rec_depth, f=0, noise_threshold=0,
                  start_activities=None, end_activities=None, initial_start_activities=None,
                  initial_end_activities=None, parameters=None, real_init=True):
         """
@@ -86,8 +86,9 @@ class MySubtreeInfrequent(SubtreeInfrequent):
             self.inverted_dfg = None
             self.parameters = parameters
             self.sender_nodes = sender_nodes
+            self.receiver_nodes = receiver_nodes
 
-            self.initialize_tree(sender_nodes, dfg, log, initial_dfg, activities)
+            self.initialize_tree(sender_nodes, receiver_nodes, dfg, log, initial_dfg, activities)
 
     def __deepcopy__(self, memodict={}):
         """
@@ -97,7 +98,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
         :param memodict:
         :return:
         """
-        S = SubtreeInfrequent(None, None, None, None, None, None, None, None, None, real_init=False)
+        S = MySubtreeInfrequent(None, None, None, None, None, None, None, None, None, None, real_init=False)
         S.master_dfg = self.master_dfg
         S.initial_dfg = self.initial_dfg
         S.counts = self.counts
@@ -128,13 +129,14 @@ class MySubtreeInfrequent(SubtreeInfrequent):
         S.initial_log = self.initial_log
         S.inverted_dfg = self.inverted_dfg
         S.sender_nodes = self.sender_nodes
+        S.receiver_nodes = self.receiver_nodes
         try:
             S.parameters = self.parameters
         except:
             pass
         return S
 
-    def initialize_tree(self, sender_nodes, dfg, log, initial_dfg, activities, second_iteration=False, end_call=True):
+    def initialize_tree(self, sender_nodes, receiver_nodes, dfg, log, initial_dfg, activities, second_iteration=False, end_call=True):
         self.second_iteration = second_iteration
 
         if activities is None:
@@ -164,6 +166,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
         self.children = []
         self.log = log
         self.sender_nodes = sender_nodes
+        self.receiver_nodes = receiver_nodes
 
         self.detect_cut_if(second_iteration=False, parameters=self.parameters)
 
@@ -295,7 +298,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                 end_activities = list(
                     end_activities_get.get_end_activities(l, parameters=self.parameters).keys())
                 self.children.append(
-                    MySubtreeInfrequent(self.sender_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
+                    MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
                                       self.rec_depth + 1, self.f,
                                       noise_threshold=self.noise_threshold, start_activities=start_activities,
                                       end_activities=end_activities,
@@ -312,7 +315,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                 end_activities = list(
                     end_activities_get.get_end_activities(l, parameters=self.parameters).keys())
                 self.children.append(
-                    MySubtreeInfrequent(self.sender_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
+                    MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
                                       self.rec_depth + 1, self.f,
                                       noise_threshold=self.noise_threshold, start_activities=start_activities,
                                       end_activities=end_activities,
@@ -329,7 +332,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                 end_activities = list(
                     end_activities_get.get_end_activities(l, parameters=self.parameters).keys())
                 self.children.append(
-                    MySubtreeInfrequent(self.sender_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
+                    MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
                                       self.rec_depth + 1, self.f,
                                       noise_threshold=self.noise_threshold, start_activities=start_activities,
                                       end_activities=end_activities,
@@ -346,7 +349,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                 end_activities = list(
                     end_activities_get.get_end_activities(l, parameters=self.parameters).keys())
                 self.children.append(
-                    MySubtreeInfrequent(self.sender_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
+                    MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
                                       self.rec_depth + 1, self.f,
                                       noise_threshold=self.noise_threshold,
                                       start_activities=start_activities,
@@ -368,21 +371,25 @@ class MySubtreeInfrequent(SubtreeInfrequent):
         elif single_activity:
             self.detected_cut = 'single_activity'
             current_activity = list(self.activities.keys())[0]
-            filtered_initial_dfg = [x[0][0] for x in self.initial_dfg if x[0][1] == current_activity and x[0][0] in self.initial_start_activities]
+            filtered_initial_dfg_start_activities = [x[0][0] for x in self.initial_dfg if x[0][1] == current_activity and x[0][0] in self.initial_start_activities]
+            filtered_initial_dfg_end_activities = [x[0][1] for x in self.initial_dfg if x[0][0] == current_activity and x[0][1] in self.initial_end_activities]
             # remove from filtered_initial_dfg the activities that are in the log
-            if len(filtered_initial_dfg) > 0:
-                any_log_activity = []
-                for trace in self.initial_log:
-                    for event in trace:
-                        if event[activity_key] not in any_log_activity:
-                            any_log_activity.append(event[activity_key])
-                filtered_initial_dfg = list(set(filtered_initial_dfg).difference(set(any_log_activity)))
-
-            if len(filtered_initial_dfg) > 0:
+            any_log_activity = []
+            for trace in self.initial_log:
+                for event in trace:
+                    if event[activity_key] not in any_log_activity:
+                        any_log_activity.append(event[activity_key])
+        
+            if len(filtered_initial_dfg_start_activities) > 0:
+                filtered_initial_dfg_start_activities = list(set(filtered_initial_dfg_start_activities).difference(set(any_log_activity)))
+            if len(filtered_initial_dfg_end_activities) > 0:
+                filtered_initial_dfg_end_activities = list(set(filtered_initial_dfg_end_activities).difference(set(any_log_activity)))
+            
+            if len(filtered_initial_dfg_start_activities) > 0:
                 self.detected_cut = 'receive_message_activity'
                 from pm4py.objects.log import obj
-                for a in filtered_initial_dfg:
-                    sender_node = MySubtreeInfrequent(None, None, None, None, None, None, None, None, None, real_init=False)
+                for a in filtered_initial_dfg_start_activities:
+                    sender_node = MySubtreeInfrequent(None, None, None, None, None, None, None, None, None, None, real_init=False)
                     sender_node.detected_cut = 'single_activity'
                     sender_node.activities = {a: self.activities[current_activity]}
                     sender_node.parameters = self.parameters
@@ -392,7 +399,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                     tmp_log[0].append({activity_key: a})
                     sender_node.log = tmp_log
                     self.children.append(sender_node)
-                receiver_node = MySubtreeInfrequent(None, None, None, None, None, None, None, None, None, real_init=False)
+                receiver_node = MySubtreeInfrequent(None, None, None, None, None, None, None, None, None, None, real_init=False)
                 receiver_node.detected_cut = 'single_activity'
                 receiver_node.activities = {current_activity: self.activities[current_activity]}
                 receiver_node.parameters = self.parameters
@@ -402,6 +409,31 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                 tmp_log[0].append({activity_key: current_activity})
                 receiver_node.log = tmp_log
                 self.children.append(receiver_node)
+            
+            if len(filtered_initial_dfg_end_activities) > 0:
+                self.detected_cut = 'send_message_activity'
+                from pm4py.objects.log import obj
+                receiver_node = MySubtreeInfrequent(None, None, None, None, None, None, None, None, None, None, real_init=False)
+                receiver_node.detected_cut = 'single_activity'
+                receiver_node.activities = {current_activity: self.activities[current_activity]}
+                receiver_node.parameters = self.parameters
+                tmp_log = obj.EventLog()
+                tmp_log.attributes.clear()
+                tmp_log.append([])
+                tmp_log[0].append({activity_key: current_activity})
+                receiver_node.log = tmp_log
+                self.children.append(receiver_node)
+                for a in filtered_initial_dfg_end_activities:
+                    sender_node = MySubtreeInfrequent(None, None, None, None, None, None, None, None, None, None, real_init=False)
+                    sender_node.detected_cut = 'single_activity'
+                    sender_node.activities = {a: self.activities[current_activity]}
+                    sender_node.parameters = self.parameters
+                    tmp_log = obj.EventLog()
+                    tmp_log.attributes.clear()
+                    tmp_log.append([])
+                    tmp_log[0].append({activity_key: a})
+                    sender_node.log = tmp_log
+                    self.children.append(sender_node)
 
         # if no base cases are found, search for a cut:
         # use the cutting and splitting functions of im_plain:
@@ -428,7 +460,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                             end_activities = list(
                                 end_activities_get.get_end_activities(l, parameters=parameters).keys())
                             self.children.append(
-                                MySubtreeInfrequent(self.sender_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
+                                MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
                                                   self.counts,
                                                   self.rec_depth + 1, self.f,
                                                   noise_threshold=self.noise_threshold,
@@ -449,7 +481,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                             end_activities = list(
                                 end_activities_get.get_end_activities(l, parameters=parameters).keys())
                             self.children.append(
-                                MySubtreeInfrequent(self.sender_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
+                                MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
                                                   self.counts,
                                                   self.rec_depth + 1, self.f,
                                                   noise_threshold=self.noise_threshold,
@@ -470,7 +502,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                             end_activities = list(
                                 end_activities_get.get_end_activities(l, parameters=parameters).keys())
                             self.children.append(
-                                MySubtreeInfrequent(self.sender_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
+                                MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
                                                   self.counts,
                                                   self.rec_depth + 1, self.f,
                                                   noise_threshold=self.noise_threshold,
@@ -491,7 +523,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                             end_activities = list(
                                 end_activities_get.get_end_activities(l, parameters=parameters).keys())
                             self.children.append(
-                                MySubtreeInfrequent(self.sender_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
+                                MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, l, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
                                                   self.counts,
                                                   self.rec_depth + 1, self.f,
                                                   noise_threshold=self.noise_threshold,
@@ -540,7 +572,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
             end_activities = list(
                 end_activities_get.get_end_activities(new_log, parameters=parameters).keys())
             self.children.append(
-                MySubtreeInfrequent(self.sender_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
+                MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities, self.counts,
                                   self.rec_depth + 1, self.f,
                                   noise_threshold=self.noise_threshold,
                                   start_activities=start_activities,
@@ -571,7 +603,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                     end_activities_get.get_end_activities(new_log, parameters=parameters).keys())
                 # append the chosen activity as leaf:
                 self.children.append(
-                    MySubtreeInfrequent(self.sender_nodes, small_log, self.initial_log, small_dfg, self.master_dfg, self.initial_dfg, small_activities,
+                    MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, small_log, self.initial_log, small_dfg, self.master_dfg, self.initial_dfg, small_activities,
                                       self.counts,
                                       self.rec_depth + 1, self.f,
                                       noise_threshold=self.noise_threshold,
@@ -579,7 +611,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                                       initial_end_activities=self.initial_end_activities, parameters=parameters))
                 # continue with the recursion on the new log
                 self.children.append(
-                    MySubtreeInfrequent(self.sender_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
+                    MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg, activities,
                                       self.counts,
                                       self.rec_depth + 1, self.f,
                                       noise_threshold=self.noise_threshold,
@@ -611,7 +643,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                         end_activities_get.get_end_activities(new_log, parameters=parameters).keys())
                     # append the concurrent activity as leaf:
                     self.children.append(
-                        MySubtreeInfrequent(self.sender_nodes, small_log, self.initial_log, small_dfg, self.master_dfg, self.initial_dfg,
+                        MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, small_log, self.initial_log, small_dfg, self.master_dfg, self.initial_dfg,
                                           small_activities,
                                           self.counts,
                                           self.rec_depth + 1, self.f,
@@ -620,7 +652,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                                           initial_end_activities=self.initial_end_activities, parameters=parameters))
                     # continue with the recursion on the new log:
                     self.children.append(
-                        MySubtreeInfrequent(self.sender_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg,
+                        MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg,
                                           activities,
                                           self.counts,
                                           self.rec_depth + 1, self.f,
@@ -645,7 +677,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                         end_activities = list(
                             end_activities_get.get_end_activities(new_log, parameters=parameters).keys())
                         self.children.append(
-                            MySubtreeInfrequent(self.sender_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg,
+                            MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg,
                                               activities,
                                               self.counts,
                                               self.rec_depth + 1, self.f,
@@ -670,7 +702,7 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                             end_activities = list(
                                 end_activities_get.get_end_activities(new_log, parameters=parameters).keys())
                             self.children.append(
-                                MySubtreeInfrequent(self.sender_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg,
+                                MySubtreeInfrequent(self.sender_nodes, self.receiver_nodes, new_log, self.initial_log, new_dfg, self.master_dfg, self.initial_dfg,
                                                   activities,
                                                   self.counts,
                                                   self.rec_depth + 1, self.f,
@@ -686,12 +718,12 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                             # apply flower fall through as last option:
 
 
-def my_make_tree(sender_nodes, log, dfg, master_dfg, initial_dfg, activities, c, f, recursion_depth, noise_threshold, start_activities,
+def my_make_tree(sender_nodes, receiver_nodes, log, dfg, master_dfg, initial_dfg, activities, c, f, recursion_depth, noise_threshold, start_activities,
               end_activities, initial_start_activities, initial_end_activities, parameters=None):
     if parameters is None:
         parameters = {}
 
-    tree = MySubtreeInfrequent(sender_nodes, log, log, dfg, master_dfg, initial_dfg, activities, c, f, recursion_depth, noise_threshold,
+    tree = MySubtreeInfrequent(sender_nodes, receiver_nodes, log, log, dfg, master_dfg, initial_dfg, activities, c, f, recursion_depth, noise_threshold,
                              start_activities, end_activities, initial_start_activities, initial_end_activities,
                              parameters=parameters)
     return tree

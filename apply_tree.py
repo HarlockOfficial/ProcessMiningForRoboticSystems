@@ -101,6 +101,7 @@ def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
     process_tree = []
     for index, trace in enumerate(log):
         sender_nodes_t = sender_nodes[index]
+        receiver_nodes_t = receiver_nodes[index]
         dfg_t = dfg[index]
         log_t = trace
 
@@ -111,7 +112,10 @@ def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
         for x in sender_nodes_t:
             activities[x[0][0]] = x[1]
             start_activities.append(x[0][0])
-
+        for x in receiver_nodes_t:
+            activities[x[0][1]] = x[1]
+            end_activities.append(x[0][1])
+        
         contains_empty_traces = False
         traces_length = [len(trace) for trace in log_t]
         if traces_length:
@@ -126,7 +130,7 @@ def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
 
         recursion_depth = 0
 
-        sub = my_subtree_infrequent.my_make_tree(sender_nodes_t, log_t, dfg_t, dfg_t, dfg_t, activities, c, recursion_depth,
+        sub = my_subtree_infrequent.my_make_tree(sender_nodes_t, receiver_nodes_t, log_t, dfg_t, dfg_t, dfg_t, activities, c, recursion_depth,
                                                  noise_threshold, threshold,
                                                  start_activities, end_activities,
                                                  start_activities, end_activities, parameters=parameters)
@@ -149,7 +153,7 @@ def get_tree_repr_implain_get_repr(spec_tree_struct, rec_depth, contains_empty_t
                                               xes_constants.DEFAULT_NAME_KEY)
 
     base_cases = ('empty_log', 'single_activity')
-    cut = ('concurrent', 'sequential', 'parallel', 'loopCut', 'receive_message_activity')
+    cut = ('concurrent', 'sequential', 'parallel', 'loopCut', 'receive_message_activity', 'send_message_activity')
     # note that the activity_once_per_trace is not included here, as it is can be dealt with as a parallel cut
     fall_throughs = ('empty_trace', 'strict_tau_loop', 'tau_loop', 'flower')
 
@@ -165,7 +169,9 @@ def get_tree_repr_implain_get_repr(spec_tree_struct, rec_depth, contains_empty_t
             final_tree_repr = ProcessTree(operator=Operator.PARALLEL)
         elif spec_tree_struct.detected_cut == "receive_message_activity":
             final_tree_repr = ProcessTree(operator=Operator.RECEIVE_MESSAGE)
-
+        elif spec_tree_struct.detected_cut == "send_message_activity":
+            final_tree_repr = ProcessTree(operator=Operator.SEND_MESSAGE)
+        
         if not (spec_tree_struct.detected_cut == "loopCut" and len(spec_tree_struct.children) >= 3):
             for ch in spec_tree_struct.children:
                 # get the representation of the current child (from children in the subtree-structure):
