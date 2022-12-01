@@ -1,11 +1,12 @@
 import pm4py
 from pm4py.algo.discovery.inductive.variants.im_f.algorithm import Parameters
+from typing import List
 import my_to_bpmn
 import view_process_tree
 import apply_tree
 
 
-def import_xes(file_path: list[str]):
+def import_xes(file_path: List[str]):
     event_log = []
     for file_name in file_path:
         event_log.append(pm4py.read_xes(file_name))

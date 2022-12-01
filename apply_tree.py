@@ -12,6 +12,8 @@ from pm4py.statistics.attributes.log import get as attributes_get
 from pm4py.statistics.end_activities.log import get as end_activities_get
 from pm4py.statistics.start_activities.log import get as start_activities_get
 import pm4py
+from typing import List, Dict, Tuple
+
 import my_subtree_infrequent
 from pm4py.objects.process_tree.obj import ProcessTree
 import MyOperator
@@ -20,8 +22,11 @@ from pm4py.util import exec_utils, xes_constants
 from pm4py.algo.discovery.inductive.variants.im.util.get_tree_repr_implain import get_transition
 
 
-def discover_in_nodes(log: list[EventLog], dfg: dict[int, list[tuple[tuple[str, str], int]]], activity_key: str) -> \
-        dict[int, list[tuple[tuple[str, str], int]]]:
+def discover_in_nodes(log: List[EventLog], dfg_list: List[List[Tuple[Tuple[str, str], int]]], activity_key: str) -> \
+        Tuple[List[List[Tuple[Tuple[str, str], int]]], List[List[Tuple[Tuple[str, str], int]]]]:
+
+    sender_nodes = [[] for _ in range(len(dfg_list))]
+    receiver_nodes = [[] for _ in range(len(dfg_list))]
 
     #discover receiving nodes
     sender_nodes = {}
@@ -54,8 +59,7 @@ def discover_out_nodes(log: list[EventLog], dfg: list[tuple[tuple[str, str], int
     receiver_nodes = []
     return receiver_nodes
 
-
-def my_apply_tree(log: list[EventLog], parameters):
+def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
     activity_key = exec_utils.get_param_value(Parameters.ACTIVITY_KEY, parameters,
                                               pmutil.xes_constants.DEFAULT_NAME_KEY)
     '''DFG INIT'''
@@ -230,7 +234,7 @@ def get_tree_repr_implain_get_repr(spec_tree_struct, rec_depth, contains_empty_t
     return final_tree_repr
 
 
-def my_apply_im_f(log: list[EventLog], parameters):
+def my_apply_im_f(log: List[EventLog], parameters):
     from pm4py.objects.conversion.log import converter
     for index, trace in enumerate(log):
         log[index] = converter.apply(trace, parameters=parameters)
