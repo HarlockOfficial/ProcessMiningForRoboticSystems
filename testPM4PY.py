@@ -1,6 +1,6 @@
+from typing import List
 import pm4py
 from pm4py.algo.discovery.inductive.variants.im_f.algorithm import Parameters
-from typing import List
 import my_to_bpmn
 import view_process_tree
 import apply_tree
@@ -23,11 +23,15 @@ def import_xes(file_path: List[str]):
         # im_f_algorithm.Parameters.TAU_LOOP_KEY: "tau_loop",
     }
     process_tree = apply_tree.pm4py.algo.discovery.inductive.variants.im_f.algorithm.apply(event_log, parameters=params)
+    
+    import graphviz
     for tree in process_tree:
-        view_process_tree.pm4py.view_process_tree(tree)
-        res = my_to_bpmn.pm4py.convert_to_bpmn(tree)
-        my_to_bpmn.pm4py.view_bpmn(res)
-        print(tree)
+        try:
+            view_process_tree.pm4py.view_process_tree(tree)
+            res = my_to_bpmn.pm4py.convert_to_bpmn(tree)
+            my_to_bpmn.pm4py.view_bpmn(res)
+        except graphviz.backend.execute.ExecutableNotFound:
+            print(tree)
 
 
 if __name__ == "__main__":
