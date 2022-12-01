@@ -22,10 +22,10 @@ def import_xes(file_path: List[str]):
         # im_f_algorithm.Parameters.STRICT_TAU_LOOP_KEY: "strict_tau_loop",
         # im_f_algorithm.Parameters.TAU_LOOP_KEY: "tau_loop",
     }
-    process_tree = apply_tree.pm4py.algo.discovery.inductive.variants.im_f.algorithm.apply(event_log, parameters=params)
+    process_tree_list = apply_tree.pm4py.algo.discovery.inductive.variants.im_f.algorithm.apply(event_log, parameters=params)
     
     import graphviz
-    for tree in process_tree:
+    for tree in process_tree_list:
         try:
             view_process_tree.pm4py.view_process_tree(tree)
             res = my_to_bpmn.pm4py.convert_to_bpmn(tree)
