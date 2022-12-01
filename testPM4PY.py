@@ -23,9 +23,11 @@ def import_xes(file_path: List[str]):
         # im_f_algorithm.Parameters.TAU_LOOP_KEY: "tau_loop",
     }
     process_tree = apply_tree.pm4py.algo.discovery.inductive.variants.im_f.algorithm.apply(event_log, parameters=params)
-    view_process_tree.pm4py.view_process_tree(process_tree)
-    res = my_to_bpmn.pm4py.convert_to_bpmn(process_tree)
-    my_to_bpmn.pm4py.view_bpmn(res)
+    for tree in process_tree:
+        view_process_tree.pm4py.view_process_tree(tree)
+        res = my_to_bpmn.pm4py.convert_to_bpmn(tree)
+        my_to_bpmn.pm4py.view_bpmn(res)
+        print(tree)
 
 
 if __name__ == "__main__":
