@@ -42,30 +42,28 @@ def discover_in_nodes(log: List[EventLog], dfg_list: List[List[Tuple[Tuple[str, 
                                 if 'msgType' in event_2.keys() and event_2['msgType'] == 'receive' and event_2[
                                         activity_key] not in send_receive_dict.keys():
                                     if event_1['msgFlow'] == event_2['msgFlow']:
-                                        send_list.append((event_1, event_2))
+                                        send_list.append((event_1[activity_key], event_2[activity_key]))
                                         send_receive_dict[event_1[activity_key]] = True
                                         send_receive_dict[event_2[activity_key]] = True
     for elem in send_list:
-        # print(elem[0][activity_key], elem[1][activity_key])
         for index, dfg in enumerate(dfg_list):
             found_sender = -1
             found_receiver = -1
             for element in dfg:
-                if element[0][1] == elem[0][activity_key]:
+                if element[0][1] == elem[0] or element[0][0] == elem[0]:
                     # found sender
                     found_sender = element[1]
-                    pass
-                if element[0][0] == elem[1][activity_key]:
+                if element[0][0] == elem[1] or element[0][1] == elem[1]:
                     # found receiver
                     found_receiver = element[1]
 
             if found_sender != -1:
-                dfg.append(((elem[0][activity_key], elem[1][activity_key]), found_sender))
-                sender_nodes[index].append(((elem[0][activity_key], elem[1][activity_key]), found_sender))
+                dfg.append(((elem[0], elem[1]), found_sender))
+                sender_nodes[index].append(((elem[0], elem[1]), found_sender))
 
             if found_receiver != -1:
-                dfg.append(((elem[0][activity_key], elem[1][activity_key]), found_receiver))
-                receiver_nodes[index].append(((elem[0][activity_key], elem[1][activity_key]), found_receiver))
+                dfg.append(((elem[0], elem[1]), found_receiver))
+                receiver_nodes[index].append(((elem[0], elem[1]), found_receiver))
 
     return sender_nodes, receiver_nodes
 
