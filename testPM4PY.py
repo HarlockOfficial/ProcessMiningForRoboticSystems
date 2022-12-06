@@ -2,6 +2,7 @@ from typing import List
 import pm4py
 from pm4py.algo.discovery.inductive.variants.im_f.algorithm import Parameters
 import my_to_bpmn
+from pm4py.objects.bpmn.layout import layouter
 import view_process_tree
 import apply_tree
 
@@ -29,6 +30,8 @@ def import_xes(file_path: List[str]):
         try:
             view_process_tree.pm4py.view_process_tree(tree)
             res = my_to_bpmn.pm4py.convert_to_bpmn(tree)
+            res = layouter.apply(res)
+            pm4py.write_bpmn(res, "ru.bpmn")
             my_to_bpmn.pm4py.view_bpmn(res)
         except graphviz.backend.execute.ExecutableNotFound:
             print(tree)
