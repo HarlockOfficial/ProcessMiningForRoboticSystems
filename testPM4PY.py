@@ -29,6 +29,8 @@ def import_xes(file_path: List[str]):
     import collaboration_graph
     collaboration_graph_ = collaboration_graph.algorithm.apply_collaboration_graph(process_tree_list)
     print(collaboration_graph_)
+
+    view_process_tree.pm4py.view_process_tree(collaboration_graph_)
     """
     import graphviz
     for tree in process_tree_list:
