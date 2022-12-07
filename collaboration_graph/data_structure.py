@@ -1,3 +1,4 @@
+import copy
 from typing import Union, Tuple
 
 from pm4py.objects.process_tree.obj import ProcessTree
@@ -14,6 +15,24 @@ class CollaborationGraphNode(object):
         self.incoming_edges = []
         self.outgoing_edges = []
 
+    def __copy__(self):
+        new_node = CollaborationGraphNode()
+        new_node.label = self.label
+        new_node.operator = self.operator
+        return new_node
+
+    def __deepcopy__(self, memodict={}):
+        new_node = CollaborationGraphNode()
+        new_node.label = copy.copy(self.label)
+        new_node.operator = copy.copy(self.operator)
+        return new_node
+
+    def __eq__(self, other):
+        return self.label == other.label and self.operator == other.operator
+
+    def __hash__(self):
+        return hash(self.label) + hash(self.operator) ** 64
+
     def __get_repr__(self):
         return self.__str__()
 
@@ -28,6 +47,33 @@ class CollaborationGraph(object):
     def __init__(self):
         self.nodes = []
         self.edges = []
+
+    def __copy__(self):
+        new_graph = CollaborationGraph()
+        new_graph.nodes = copy.copy(self.nodes)
+        new_graph.edges = copy.copy(self.edges)
+        return new_graph
+
+    def __deepcopy__(self, memodict={}):
+        new_graph = CollaborationGraph()
+        new_graph.nodes = copy.deepcopy(self.nodes)
+        new_graph.edges = copy.deepcopy(self.edges)
+        return new_graph
+
+    def __eq__(self, other):
+        for node in self.nodes:
+            if node not in other.nodes:
+                return False
+        for edge in self.edges:
+            if edge not in other.edges:
+                return False
+        for node in other.nodes:
+            if node not in self.nodes:
+                return False
+        for edge in other.edges:
+            if edge not in self.edges:
+                return False
+        return True
 
     def get_node(self, node: Union[ProcessTree, str, CollaborationGraphNode]) -> CollaborationGraphNode:
         if isinstance(node, ProcessTree) or isinstance(node, CollaborationGraphNode):
