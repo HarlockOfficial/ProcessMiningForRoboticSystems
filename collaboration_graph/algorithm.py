@@ -1,7 +1,5 @@
 import uuid
 
-from pm4py.objects.bpmn.obj import BPMN
-
 import MyOperator
 from pm4py.objects.process_tree.obj import Operator
 
@@ -9,7 +7,7 @@ from typing import List
 
 from pm4py.objects.process_tree.obj import ProcessTree
 
-from CollaborationGraph.data_structure import CollaborationGraph, CollaborationGraphNode
+from collaboration_graph.data_structure import CollaborationGraph, CollaborationGraphNode
 
 
 def to_collaboration_graph(node: ProcessTree, graph: CollaborationGraph = CollaborationGraph(), depth: int = 0) -> CollaborationGraph:
