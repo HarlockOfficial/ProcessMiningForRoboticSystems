@@ -1,6 +1,8 @@
 from typing import List
 import pm4py
 from pm4py.algo.discovery.inductive.variants.im_f.algorithm import Parameters
+
+import collaboration_graph.algorithm
 import my_to_bpmn
 from pm4py.objects.bpmn.layout import layouter
 import view_process_tree
@@ -24,7 +26,10 @@ def import_xes(file_path: List[str]):
         # im_f_algorithm.Parameters.TAU_LOOP_KEY: "tau_loop",
     }
     process_tree_list = apply_tree.pm4py.algo.discovery.inductive.variants.im_f.algorithm.apply(event_log, parameters=params)
-    
+    import collaboration_graph
+    collaboration_graph_ = collaboration_graph.algorithm.apply_collaboration_graph(process_tree_list)
+    print(collaboration_graph_)
+    """
     import graphviz
     for tree in process_tree_list:
         try:
@@ -35,7 +40,7 @@ def import_xes(file_path: List[str]):
             my_to_bpmn.pm4py.view_bpmn(res)
         except graphviz.backend.execute.ExecutableNotFound:
             print(tree)
-
+    """
 
 if __name__ == "__main__":
     import_xes(['Logs/real/hospital.xes',
