@@ -69,7 +69,6 @@ def my_apply(tree: CollaborationGraph,
     return viz
 
 
-# TODO fix this, it has to work with CollaborationGraph, aka list of nodes and edges
 def my_tree_sort(tree):
     """
     Sort a tree in such way that the order of the nodes
@@ -81,43 +80,38 @@ def my_tree_sort(tree):
     tree
         Process tree
     """
+    if isinstance(tree, CollaborationGraph):
+        tree = tree.get_root()
     tree.labels_hash_sum = 0
     for child in tree.children:
         my_tree_sort(child)
         tree.labels_hash_sum += child.labels_hash_sum
     if tree.label is not None:
         # this assures that among different executions, the same string gets always the same hash
-        this_hash = int(hashlib.md5(str(tree.label).encode(constants.DEFAULT_ENCODING)).hexdigest(), 16)
+        this_hash = int(hashlib.md5(str(tree).encode(constants.DEFAULT_ENCODING)).hexdigest(), 16)
         tree.labels_hash_sum += this_hash
     if tree.operator is Operator.PARALLEL or tree.operator is Operator.XOR:
         tree.children = sorted(tree.children, key=lambda x: x.labels_hash_sum)
 
 
-# TODO fix this, it has to work with CollaborationGraph, aka list of nodes and edges
 def my_repr_tree_2(tree, viz, color_map, parameters):
     font_size = exec_utils.get_param_value(Parameters.FONT_SIZE, parameters, 15)
     font_size = str(font_size)
 
-    this_node_id = str(id(tree))
-
-    if tree.operator is None:
-        if tree.label is None:
-            viz.node(this_node_id, "tau", style='filled', fillcolor='black', shape='point', width="0.075",
+    for node in tree.nodes:
+        if node.label is None:
+            viz.node("tau_" + str(id(node)), style='filled', fillcolor='black', shape='point', width="0.075",
                      fontsize=font_size)
         else:
-            node_color = get_color(tree, color_map)
-            viz.node(this_node_id, str(tree.label), color=node_color, fontcolor=node_color, fontsize=font_size)
-    else:
-        node_color = get_color(tree, color_map)
-        viz.node(this_node_id,
-                 pm4py.visualization.process_tree.variants.wo_decoration.operators_mapping[str(tree.operator)],
-                 color=node_color, fontcolor=node_color, fontsize=font_size)
+            node_color = get_color(node, color_map)
+            viz.node(str(node), color=node_color, fontcolor=node_color, fontsize=font_size)
 
-        for child in tree.children:
-            my_repr_tree_2(child, viz, color_map, parameters)
-
-    if tree.parent is not None:
-        viz.edge(str(id(tree.parent)), this_node_id, dirType='none')
+    for edge in tree.edges:
+        if edge[0].label is None:
+            edge[0] = "tau_" + str(id(edge[0]))
+        if edge[1].label is None:
+            edge[1] = "tau_" + str(id(edge[1]))
+        viz.edge(str(edge[0]), str(edge[1]), dirType='normal')
 
 
 import pm4py.objects.process_tree.utils.generic

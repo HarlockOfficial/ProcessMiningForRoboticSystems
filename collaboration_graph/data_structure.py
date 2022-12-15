@@ -5,7 +5,7 @@ from pm4py.objects.process_tree.obj import ProcessTree
 
 
 class CollaborationGraphNode(object):
-    def __init__(self, label: str = None, node: ProcessTree = None):
+    def __init__(self, label: str = None, node: ProcessTree = None, index: int = -1):
         self.label = label
         if node is not None:
             self.operator = node.operator
@@ -14,17 +14,22 @@ class CollaborationGraphNode(object):
             self.operator = None
         self.incoming_edges = []
         self.outgoing_edges = []
+        self.parent = []
+        self.children = []
+        self.index = index
 
     def __copy__(self):
         new_node = CollaborationGraphNode()
         new_node.label = self.label
         new_node.operator = self.operator
+        new_node.index = self.index
         return new_node
 
     def __deepcopy__(self, memodict={}):
         new_node = CollaborationGraphNode()
         new_node.label = copy.copy(self.label)
         new_node.operator = copy.copy(self.operator)
+        new_node.index = copy.copy(self.index)
         return new_node
 
     def __eq__(self, other):
@@ -37,10 +42,10 @@ class CollaborationGraphNode(object):
         return self.__str__()
 
     def __str__(self):
-        return self.label if self.operator is None else self.operator.name
+        return str(self.index) + " " + self.label # if self.operator is None else self.operator.name
 
     def get_name(self):
-        return self.label
+        return str(self.index) + " " + self.label
 
 
 class CollaborationGraph(object):
@@ -113,6 +118,8 @@ class CollaborationGraph(object):
         node_1, node_2 = self.__get_nodes_from_edge(node_1, node_2, edge)
         node_1.outgoing_edges.append(node_2)
         node_2.incoming_edges.append(node_1)
+        node_1.children.append(node_2)
+        node_2.parent.append(node_1)
         self.edges.append((node_1, node_2))
 
     def get_graph(self):
@@ -131,6 +138,8 @@ class CollaborationGraph(object):
         node_1, node_2 = self.__get_nodes_from_edge(node_1, node_2, edge)
         node_1.outgoing_edges.remove(node_2)
         node_2.incoming_edges.remove(node_1)
+        node_1.children.remove(node_2)
+        node_2.parent.remove(node_1)
         self.edges.remove((node_1, node_2))
 
     def __get_nodes_from_edge(self, node_1: Union[CollaborationGraphNode],
@@ -145,3 +154,9 @@ class CollaborationGraph(object):
         else:
             raise Exception("Invalid params")
         return node_1, node_2
+
+    def get_root(self) -> CollaborationGraphNode:
+        node = self.nodes[0]
+        while len(node.incoming_edges) > 0:
+            node = node.incoming_edges[0]
+        return node

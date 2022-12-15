@@ -1,4 +1,5 @@
 import logging
+import pkgutil
 from copy import copy
 
 import pm4py
@@ -8,13 +9,14 @@ from pm4py.algo.discovery.dfg.utils.dfg_utils import get_activities_from_dfg, \
 from pm4py.algo.discovery.dfg.utils.dfg_utils import get_ingoing_edges, get_outgoing_edges
 from pm4py.algo.discovery.dfg.utils.dfg_utils import negate, get_activities_self_loop
 from pm4py.algo.discovery.dfg.variants import native as dfg_inst
-from pm4py.algo.discovery.inductive.util import detection_utils
+from pm4py.algo.discovery.inductive.util import detection_utils, cut_detection
 from pm4py.algo.discovery.inductive.variants.im.util import base_case
 from pm4py.algo.discovery.inductive.variants.im.util import fall_through
 from pm4py.algo.discovery.inductive.variants.im.util import splitting as split
 from pm4py.algo.discovery.inductive.variants.im_f import splitting_infrequent, fall_through_infrequent
 from pm4py.algo.discovery.inductive.variants.im_f.algorithm import Parameters
 from pm4py.algo.filtering.dfg.dfg_filtering import clean_dfg_based_on_noise_thresh
+from pm4py.objects.dfg.utils.dfg_utils import transform_dfg_to_directed_nx_graph
 from pm4py.statistics.attributes.log import get as attributes_get
 from pm4py.statistics.end_activities.log import get as end_activities_get
 from pm4py.statistics.start_activities.log import get as start_activities_get
@@ -169,121 +171,6 @@ class MySubtreeInfrequent(SubtreeInfrequent):
         self.receiver_nodes = receiver_nodes
 
         self.detect_cut_if(second_iteration=False, parameters=self.parameters)
-
-    def detect_loop(self):
-        # p0 is part of return value, it contains the partition of activities
-        # write all start and end activities in p1
-        if self.contains_empty_trace():
-            return [False, []]
-        start_activities = list(
-            start_activities_get.get_start_activities(self.log, parameters=self.parameters).keys())
-
-        end_activities = list(end_activities_get.get_end_activities(self.log, parameters=self.parameters).keys())
-        for x in self.sender_nodes:
-            start_activities.append(x[0][0])
-        # TODO check if sta
-        p1 = []
-        for act in start_activities:
-            if act not in p1:
-                p1.append(act)
-        for act in end_activities:
-            if act not in p1:
-                p1.append(act)
-
-        # create new dfg without the transitions to start and end activities
-        new_dfg = copy(self.dfg)
-        copy_dfg = copy(new_dfg)
-        for ele in copy_dfg:
-            if ele[0][0] in p1 or ele[0][1] in p1:
-                new_dfg.remove(ele)
-        # get connected components of this new dfg
-        new_ingoing = get_ingoing_edges(new_dfg)
-        new_outgoing = get_outgoing_edges(new_dfg)
-        # it was a pain in the *** to get a working directory of the current_activities, as we can't iterate ove the dfg
-        current_activities = {}
-        for element in self.activities:
-            if element not in p1:
-                current_activities.update({element: 1})
-        p0 = detection_utils.get_connected_components(new_ingoing, new_outgoing, current_activities)
-        p0.insert(0, p1)
-
-        iterable_dfg = []
-        for i in range(0, len(self.dfg)):
-            iterable_dfg.append(self.dfg[i][0])
-        # p0 is like P1,P2,...,Pn in line 3 on page 190 of the IM Thesis
-        # check for subsets in p0 that have connections to and end or from a start activity
-        p0_copy = []
-        for int_el in p0:
-            p0_copy.append(int_el)
-        for element in p0_copy:  # for every set in p0
-            removed = False
-            if element in p0 and element != p0[0]:
-                for act in element:  # for every activity in this set
-                    for e in end_activities:  # for every end activity
-                        if e not in start_activities:
-                            if (act, e) in iterable_dfg:  # check if connected
-                                # is there an element in dfg pointing from any act in a subset of p0 to an end activity
-                                for activ in element:
-                                    if activ not in p0[0]:
-                                        p0[0].append(activ)
-                                if element in p0:
-                                    p0.remove(element)  # remove subsets that are connected to an end activity
-                                removed = True
-                                break
-                    if removed:
-                        break
-                    for s in start_activities:
-                        if s not in end_activities:
-                            if not removed:
-                                if (s, act) in iterable_dfg:
-                                    for acti in element:
-                                        if acti not in p0[0]:
-                                            p0[0].append(acti)
-                                    if element in p0:
-                                        p0.remove(element)  # remove subsets that are connected to an end activity
-                                    removed = True
-                                    break
-                            else:
-                                break
-                    if removed:
-                        break
-
-        iterable_dfg = []
-        for i in range(0, len(self.dfg)):
-            iterable_dfg.append(self.dfg[i][0])
-
-        p0_copy = []
-        for int_el in p0:
-            p0_copy.append(int_el)
-        for element in p0_copy:
-            if element in p0 and element != p0[0]:
-                for act in element:
-                    for e in self.end_activities:
-                        if (e, act) in iterable_dfg:  # get those act, that are connected from an end activity
-                            for e2 in self.end_activities:  # check, if the act is connected from all end activities
-                                if (e2, act) not in iterable_dfg:
-                                    for acti in element:
-                                        if acti not in p0[0]:
-                                            p0[0].append(acti)
-                                    if element in p0:
-                                        p0.remove(element)  # remove subsets that are connected to an end activity
-                                    break
-                    for s in self.start_activities:
-                        if (act, s) in iterable_dfg:  # same as above (in this case for activities connected to
-                            # a start activity)
-                            for s2 in self.start_activities:
-                                if (act, s2) not in iterable_dfg:
-                                    for acti in element:
-                                        if acti not in p0[0]:
-                                            p0[0].append(acti)
-                                    if element in p0:
-                                        p0.remove(element)  # remove subsets that are connected to an end activity
-                                    break
-
-        if len(p0) > 1:
-            return [True, p0]
-        else:
-            return [False, []]
 
     #TODO; da modificare rimuovendo log
     def apply_cut_im_plain(self, type_of_cut, cut, activity_key):
@@ -718,13 +605,12 @@ class MySubtreeInfrequent(SubtreeInfrequent):
                             # apply flower fall through as last option:
 
 
-def my_make_tree(sender_nodes, receiver_nodes, log, dfg, master_dfg, initial_dfg, activities, c, f, recursion_depth, noise_threshold, start_activities,
-              end_activities, initial_start_activities, initial_end_activities, parameters=None):
+def my_make_tree(sender_nodes, receiver_nodes, log, original_dfg, dfg, activities, c, f, recursion_depth, noise_threshold, start_activities, end_activities, parameters=None):
     if parameters is None:
         parameters = {}
 
-    tree = MySubtreeInfrequent(sender_nodes, receiver_nodes, log, log, dfg, master_dfg, initial_dfg, activities, c, f, recursion_depth, noise_threshold,
-                             start_activities, end_activities, initial_start_activities, initial_end_activities,
+    tree = MySubtreeInfrequent(sender_nodes, receiver_nodes, log, log, original_dfg, dfg, dfg, activities, c, f, recursion_depth, noise_threshold,
+                             start_activities, end_activities, start_activities, end_activities,
                              parameters=parameters)
     return tree
 

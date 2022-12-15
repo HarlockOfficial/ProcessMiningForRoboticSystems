@@ -1,3 +1,4 @@
+import copy
 from typing import List, Tuple
 
 import pm4py
@@ -10,6 +11,7 @@ from pm4py.algo.discovery.inductive.variants.im.util.get_tree_repr_implain impor
 from pm4py.algo.discovery.inductive.variants.im_f.algorithm import Parameters
 from pm4py.objects.log.obj import EventLog
 from pm4py.objects.log.util import filtering_utils
+import MyOperator
 from pm4py.objects.process_tree.obj import Operator
 from pm4py.objects.process_tree.obj import ProcessTree
 from pm4py.objects.process_tree.utils import generic
@@ -24,7 +26,6 @@ import my_subtree_infrequent
 
 def discover_in_nodes(log: List[EventLog], dfg_list: List[List[Tuple[Tuple[str, str], int]]], activity_key: str) -> \
         Tuple[List[List[Tuple[Tuple[str, str], int]]], List[List[Tuple[Tuple[str, str], int]]]]:
-
     sender_nodes = [[] for _ in range(len(dfg_list))]
     receiver_nodes = [[] for _ in range(len(dfg_list))]
 
@@ -68,11 +69,43 @@ def discover_in_nodes(log: List[EventLog], dfg_list: List[List[Tuple[Tuple[str, 
     return sender_nodes, receiver_nodes
 
 
-"""
-def discover_in_nodes(log: EventLog, dfg: list[tuple[tuple[str, str], int]]) -> list[tuple[tuple[str, str], int]]:
-    sender_nodes = [(('PIPPO', 'Receive patient results'), 50)]
-    return sender_nodes
-"""
+def remove_double_edges(tree: ProcessTree):
+    """
+    Removes double edges from the tree
+
+    Parameters
+    --------------
+    tree
+        Process tree
+    """
+    for index_1, node_1 in enumerate(tree.children):
+        for index_2, node_2 in enumerate(tree.children):
+            if index_1 != index_2 and node_1 == node_2:
+                tree.children.remove(node_2)
+
+    for child in tree.children:
+        remove_double_edges(child)
+
+
+def count_tau_children(tree: ProcessTree):
+    index_array = []
+    for index, child in enumerate(tree.children):
+        if child.label == 'tau' or (child.label is None and child.operator is None):
+            index_array.append(index)
+    return index_array
+
+
+def my_fix_root_xor_flower(tree: ProcessTree):
+    if tree.operator == Operator.XOR and len(tree.children) == 1:
+        tree.operator = tree.children[0].operator
+        tree.label = tree.children[0].label
+        tree.children = tree.children[0].children
+        my_fix_root_xor_flower(tree)
+    if tree.operator == Operator.XOR and len(tree.children) > 1:
+        tau_children_index = count_tau_children(tree)
+        if len(tau_children_index) > 0:
+            tree.children = [child for index, child in enumerate(tree.children) if index not in tau_children_index]
+            my_fix_root_xor_flower(tree)
 
 
 def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
@@ -86,7 +119,10 @@ def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
     # dfg.extend(sender_nodes)
     dfg = []
     for index, trace in enumerate(log):
-        dfg.append([(k, v) for k, v in dfg_inst.apply(trace, parameters=parameters).items() if v > 0])
+        tmp_dfg = [(k, v) for k, v in dfg_inst.apply(trace, parameters=parameters).items() if v > 0]
+        dfg.append(tmp_dfg)
+
+    original_dfg = copy.deepcopy(dfg)
     receiver_nodes, sender_nodes = discover_in_nodes(log, dfg, activity_key)
 
     for index, trace in enumerate(log):
@@ -101,6 +137,7 @@ def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
         sender_nodes_t = sender_nodes[index]
         receiver_nodes_t = receiver_nodes[index]
         dfg_t = dfg[index]
+        original_dfg_t = original_dfg[index]
         log_t = trace
 
         c = Counts()
@@ -128,12 +165,12 @@ def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
 
         recursion_depth = 0
 
-        sub = my_subtree_infrequent.my_make_tree(sender_nodes_t, receiver_nodes_t, log_t, dfg_t, dfg_t, dfg_t, activities, c, recursion_depth,
+        sub = my_subtree_infrequent.my_make_tree(sender_nodes_t, receiver_nodes_t, log_t, original_dfg_t, dfg_t, activities, c, recursion_depth,
                                                  noise_threshold, threshold,
-                                                 start_activities, end_activities,
                                                  start_activities, end_activities, parameters=parameters)
 
         process_tree.append(get_tree_repr_implain_get_repr(sub, 0, contains_empty_traces=contains_empty_traces))
+        remove_double_edges(process_tree[index])
         # Ensures consistency to the parent pointers in the process tree
         tree_consistency.fix_parent_pointers(process_tree[index])
         # Fixes a 1 child XOR that is added when single-activities flowers are found
@@ -142,6 +179,8 @@ def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
         process_tree[index] = generic.fold(process_tree[index])
         # sorts the process tree to ensure consistency in different executions of the algorithm
         tree_sort(process_tree[index])
+
+        my_fix_root_xor_flower(process_tree[index])
 
     return process_tree
 
