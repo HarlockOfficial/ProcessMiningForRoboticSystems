@@ -30,6 +30,8 @@ def import_xes(file_path: List[str]):
     collaboration_graph_ = collaboration_graph.algorithm.apply_collaboration_graph(process_tree_list)
     # print(collaboration_graph_)
     collaboration_graph.view_graph.pm4py.view_process_tree(collaboration_graph_)
+    bpmn = collaboration_graph.to_bpmn.algorithm.my_convert_to_bpmn(collaboration_graph_)
+    pm4py.view_bpmn(bpmn)
     """
     import graphviz
     for tree in process_tree_list:

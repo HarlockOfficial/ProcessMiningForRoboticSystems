@@ -105,6 +105,26 @@ def merge_collaboration_trees(collaboration_tree_list: List[CollaborationGraph])
     return collaboration_graph
 
 
+def clean_collaboration_graph(collaboration_graph_: CollaborationGraph) -> CollaborationGraph:
+    collaboration_graph_.nodes = list(set(collaboration_graph_.nodes))
+
+    for node in collaboration_graph_.nodes:
+        child = set(node.children)
+        parent = set(node.parent)
+        node.children = list(child)
+        node.parent = list(parent)
+
+    collaboration_graph_.edges = list(set(collaboration_graph_.edges))
+
+    for edge in collaboration_graph_.edges:
+        if edge[0] is None or edge[1] is None:
+            collaboration_graph_.edges.remove(edge)
+        if edge[0] == edge[1]:
+            collaboration_graph_.edges.remove(edge)
+
+    return collaboration_graph_
+
+
 def apply_collaboration_graph(process_tree_list: List[ProcessTree]) -> CollaborationGraph:
     collaboration_tree_list = []
     all_edges_list = []
@@ -121,4 +141,5 @@ def apply_collaboration_graph(process_tree_list: List[ProcessTree]) -> Collabora
         node_1 = collaboration_graph_.get_node(edge[1])
         if (node_0, node_1) not in collaboration_graph_.edges:
             collaboration_graph_.add_edge(node_0, node_1)
+    collaboration_graph_ = clean_collaboration_graph(collaboration_graph_)
     return collaboration_graph_
