@@ -28,7 +28,7 @@ def import_xes(file_path: List[str], process_names: List[str]):
     # print(collaboration_graph_)
     # collaboration_graph.view_graph.pm4py.view_process_tree(collaboration_graph_)
     bpmn = collaboration_graph.to_bpmn.algorithm.my_convert_to_bpmn(collaboration_graph_)
-    pm4py.write_bpmn(bpmn, 'test.bpmn')
+    collaboration_graph.to_bpmn.exporter.write_bpmn(bpmn, 'test.bpmn')
 
 
 def tmp_import_xes(log_name):
