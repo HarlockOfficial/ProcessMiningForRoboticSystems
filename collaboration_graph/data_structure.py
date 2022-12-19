@@ -5,7 +5,7 @@ from pm4py.objects.process_tree.obj import ProcessTree
 
 
 class CollaborationGraphNode(object):
-    def __init__(self, label: str = None, node: ProcessTree = None, index: int = -1):
+    def __init__(self, process: str, label: str = None, node: ProcessTree = None, index: int = -1):
         self.label = label
         if node is not None:
             self.operator = node.operator
@@ -17,12 +17,14 @@ class CollaborationGraphNode(object):
         self.parent = []
         self.children = []
         self.index = index
+        self.process = process
 
     def __copy__(self):
         new_node = CollaborationGraphNode()
         new_node.label = self.label
         new_node.operator = self.operator
         new_node.index = self.index
+        new_node.process = self.process
         return new_node
 
     def __deepcopy__(self, memodict={}):
@@ -30,13 +32,14 @@ class CollaborationGraphNode(object):
         new_node.label = copy.copy(self.label)
         new_node.operator = copy.copy(self.operator)
         new_node.index = copy.copy(self.index)
+        new_node.process = copy.copy(self.process)
         return new_node
 
     def __eq__(self, other):
-        return self.label == other.label and self.operator == other.operator
+        return self.label == other.label and self.operator == other.operator and self.process == other.process
 
     def __hash__(self):
-        return hash(self.label) + hash(self.operator) ** 64
+        return hash(self.label) + hash(self.operator) ** 64 + hash(self.process) ** 128
 
     def __get_repr__(self):
         return self.__str__()

@@ -1,5 +1,5 @@
 import copy
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 import pm4py
 from pm4py import util as pmutil
@@ -108,7 +108,7 @@ def my_fix_root_xor_flower(tree: ProcessTree):
             my_fix_root_xor_flower(tree)
 
 
-def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
+def my_apply_tree(log: List[EventLog], process_names: List[str], parameters) -> Dict[str, ProcessTree]:
     activity_key = exec_utils.get_param_value(Parameters.ACTIVITY_KEY, parameters,
                                               pmutil.xes_constants.DEFAULT_NAME_KEY)
     '''DFG INIT'''
@@ -132,7 +132,7 @@ def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
     noise_threshold = exec_utils.get_param_value(Parameters.NOISE_THRESHOLD, parameters,
                                                  shared_constants.NOISE_THRESHOLD_IMF)
 
-    process_tree = []
+    process_tree = dict()
     for index, trace in enumerate(log):
         sender_nodes_t = sender_nodes[index]
         receiver_nodes_t = receiver_nodes[index]
@@ -169,18 +169,18 @@ def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
                                                  noise_threshold, threshold,
                                                  start_activities, end_activities, parameters=parameters)
 
-        process_tree.append(get_tree_repr_implain_get_repr(sub, 0, contains_empty_traces=contains_empty_traces))
-        remove_double_edges(process_tree[index])
+        process_tree[process_names[index]] = get_tree_repr_implain_get_repr(sub, 0, contains_empty_traces=contains_empty_traces)
+        remove_double_edges(process_tree[process_names[index]])
         # Ensures consistency to the parent pointers in the process tree
-        tree_consistency.fix_parent_pointers(process_tree[index])
+        tree_consistency.fix_parent_pointers(process_tree[process_names[index]])
         # Fixes a 1 child XOR that is added when single-activities flowers are found
-        tree_consistency.fix_one_child_xor_flower(process_tree[index])
+        tree_consistency.fix_one_child_xor_flower(process_tree[process_names[index]])
         # folds the process tree (to simplify it in case fallthroughs/filtering is applied)
-        process_tree[index] = generic.fold(process_tree[index])
+        process_tree[process_names[index]] = generic.fold(process_tree[process_names[index]])
         # sorts the process tree to ensure consistency in different executions of the algorithm
-        tree_sort(process_tree[index])
+        tree_sort(process_tree[process_names[index]])
 
-        my_fix_root_xor_flower(process_tree[index])
+        my_fix_root_xor_flower(process_tree[process_names[index]])
 
     return process_tree
 
@@ -292,11 +292,11 @@ def get_tree_repr_implain_get_repr(spec_tree_struct, rec_depth, contains_empty_t
     return final_tree_repr
 
 
-def my_apply_im_f(log: List[EventLog], parameters):
+def my_apply_im_f(log: List[EventLog], process_names: List[str], parameters):
     from pm4py.objects.conversion.log import converter
     for index, trace in enumerate(log):
         log[index] = converter.apply(trace, parameters=parameters)
-    tree = my_apply_tree(log, parameters)
+    tree = my_apply_tree(log, process_names, parameters)
     return tree
 
 

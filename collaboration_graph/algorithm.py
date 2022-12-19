@@ -3,18 +3,18 @@ import uuid
 import MyOperator
 from pm4py.objects.process_tree.obj import Operator
 
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from pm4py.objects.process_tree.obj import ProcessTree
 
 from collaboration_graph.data_structure import CollaborationGraph, CollaborationGraphNode
 
 
-def to_collaboration_graph(node: ProcessTree, child_index: int = -1, parent: CollaborationGraphNode = None,
+def to_collaboration_graph(node: ProcessTree, process_name: str, child_index: int = -1, parent: CollaborationGraphNode = None,
                            graph: CollaborationGraph = CollaborationGraph(), to_add_edges: List[Tuple[str, str]] = []) \
         -> Tuple[CollaborationGraph, List[Tuple[str, str]]]:
     if parent is None:
-        start_node = CollaborationGraphNode(label="Start" + uuid.uuid4().hex, index=0)
+        start_node = CollaborationGraphNode(label="Start" + uuid.uuid4().hex, index=0, process=process_name)
         graph.add_node(start_node)
         child_index = 1
     else:
@@ -26,17 +26,17 @@ def to_collaboration_graph(node: ProcessTree, child_index: int = -1, parent: Col
             graph_node.index = child_index
         except Exception:
             node.label = node.operator.name + uuid.uuid4().hex
-            graph_node = CollaborationGraphNode(node=node, index=child_index)
+            graph_node = CollaborationGraphNode(node=node, index=child_index, process=process_name)
             graph.add_node(graph_node)
         graph.add_edge(start_node, graph_node)
         for index, child in enumerate(node.children):
-            graph, new_lst = to_collaboration_graph(child, child_index=index, parent=graph_node, graph=graph,
+            graph, new_lst = to_collaboration_graph(child, process_name=process_name, child_index=index, parent=graph_node, graph=graph,
                                                     to_add_edges=to_add_edges)
             to_add_edges.extend(new_lst)
     elif node.operator == Operator.RECEIVE_MESSAGE:
         graph_node = node.children[-1]
         graph_node.parent = node.parent
-        graph, new_lst = to_collaboration_graph(graph_node, child_index=child_index, parent=graph_node.parent,
+        graph, new_lst = to_collaboration_graph(graph_node, process_name=process_name, child_index=child_index, parent=graph_node.parent,
                                                 graph=graph, to_add_edges=to_add_edges)
         to_add_edges.extend(new_lst)
         graph_node = graph.get_node(graph_node)
@@ -50,7 +50,7 @@ def to_collaboration_graph(node: ProcessTree, child_index: int = -1, parent: Col
     elif node.operator == Operator.SEND_MESSAGE:
         graph_node = node.children[0]
         graph_node.parent = node.parent
-        graph, new_lst = to_collaboration_graph(graph_node, child_index=child_index, parent=graph_node.parent,
+        graph, new_lst = to_collaboration_graph(graph_node, process_name=process_name, child_index=child_index, parent=graph_node.parent,
                                                 graph=graph, to_add_edges=to_add_edges)
         to_add_edges.extend(new_lst)
         graph_node = graph.get_node(graph_node)
@@ -62,7 +62,7 @@ def to_collaboration_graph(node: ProcessTree, child_index: int = -1, parent: Col
             except Exception:
                 to_add_edges.append((graph_node.label, child.label))
     elif node.operator is None and node.label is not None:
-        graph_node = CollaborationGraphNode(node=node, index=child_index)
+        graph_node = CollaborationGraphNode(node=node, index=child_index, process=process_name)
         if start_node.label != graph_node.label:
             graph.add_node(graph_node)
             graph.add_edge(start_node, graph_node)
@@ -97,7 +97,7 @@ def merge_collaboration_trees(collaboration_tree_list: List[CollaborationGraph])
                 collaboration_graph.add_node(node)
         for edge in collaboration_tree.edges:
             collaboration_graph.add_edge(edge=edge)
-    global_root = CollaborationGraphNode(label="GlobalStart")
+    global_root = CollaborationGraphNode(label="GlobalStart", process="Global", index=0)
     global_root.operator = Operator.PARALLEL
     collaboration_graph.add_node(global_root)
     for root in roots:
@@ -125,13 +125,14 @@ def clean_collaboration_graph(collaboration_graph_: CollaborationGraph) -> Colla
     return collaboration_graph_
 
 
-def apply_collaboration_graph(process_tree_list: List[ProcessTree]) -> CollaborationGraph:
+def apply_collaboration_graph(process_tree_dict: Dict[str, ProcessTree]) -> CollaborationGraph:
     collaboration_tree_list = []
     all_edges_list = []
-    for process_tree in process_tree_list:
+    for process_name in process_tree_dict.keys():
+        process_tree = process_tree_dict[process_name]
         # import collaboration_graph.view_graph
         # collaboration_graph.view_graph.pm4py.view_process_tree(process_tree)
-        graph, to_add_edges = to_collaboration_graph(process_tree, graph=CollaborationGraph(), to_add_edges=[])
+        graph, to_add_edges = to_collaboration_graph(process_tree, process_name, graph=CollaborationGraph(), to_add_edges=[])
         all_edges_list.extend(to_add_edges)
         graph = fix_child_nodes_indexes(graph)
         collaboration_tree_list.append(graph)

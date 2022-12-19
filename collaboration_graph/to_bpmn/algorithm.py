@@ -11,7 +11,7 @@ from pm4py.objects.process_tree.obj import Operator
 
 def find_node(node: CollaborationGraphNode, bpmn: BPMN) -> Union[BPMN.BPMNNode, None]:
     for bpmn_node in bpmn.get_nodes():
-        if id(node) == bpmn_node.get_id():
+        if str(id(node)) == bpmn_node.get_id():
             return bpmn_node
     return None
 
@@ -27,34 +27,34 @@ def recursive_create_bpmn(node: CollaborationGraphNode, parent: Union[BPMN.BPMNN
     if parent is None and not str(node.label).endswith("Start"):
         raise ValueError("The root node must be a start event")
     if str(node.label).startswith("Start") or str(node.label).endswith("Start"):
-        new_node = BPMN.StartEvent(id=id(node))
+        new_node = BPMN.StartEvent(id=str(id(node)), process=node.process)
     else:
-        new_node = BPMN.Task(id=id(node), name=node.label)
+        new_node = BPMN.Task(id=str(id(node)), name=node.label, process=node.process)
     node.children = sorted(node.children, key=lambda x: x.index)
     closing_node = None
     if node.operator is not None:
         if node.operator is Operator.XOR:
-            new_node = BPMN.ExclusiveGateway(id=id(node), gateway_direction=BPMN.Gateway.Direction.CONVERGING)
-            closing_node = BPMN.ExclusiveGateway(id=id(node)**32, gateway_direction=BPMN.Gateway.Direction.CONVERGING)
+            new_node = BPMN.ExclusiveGateway(id=str(id(node)), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
+            closing_node = BPMN.ExclusiveGateway(id=str(id(node)**32), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
         elif node.operator is Operator.SEQUENCE:
             initial_parent = parent
             for child in node.children:
                 first_node, last_node = recursive_create_bpmn(child, parent, bpmn)
                 if last_node is None:
                     last_node = first_node
-                new_flow = BPMN.Flow(source=parent, target=first_node, id=id(id(parent) ** 32 + id(child)))
+                new_flow = BPMN.Flow(source=parent, target=first_node, id=str(id(parent) ** 32 + id(child)), process=parent.process)
                 bpmn.add_flow(new_flow)
                 parent = last_node
             return initial_parent, parent
         elif node.operator is Operator.PARALLEL:
-            new_node = BPMN.ParallelGateway(id=id(node), gateway_direction=BPMN.Gateway.Direction.CONVERGING)
-            closing_node = BPMN.ParallelGateway(id=id(node)**32, gateway_direction=BPMN.Gateway.Direction.CONVERGING)
+            new_node = BPMN.ParallelGateway(id=str(id(node)), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
+            closing_node = BPMN.ParallelGateway(id=str(id(node)**32), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
         elif node.operator is Operator.LOOP:
             # TODO check which operator to use
             raise NotImplementedError("Loop operator is not implemented yet")
         elif node.operator is Operator.OR:
-            new_node = BPMN.InclusiveGateway(id=id(node), gateway_direction=BPMN.Gateway.Direction.CONVERGING)
-            closing_node = BPMN.InclusiveGateway(id=id(node)**32, gateway_direction=BPMN.Gateway.Direction.CONVERGING)
+            new_node = BPMN.InclusiveGateway(id=str(id(node)), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
+            closing_node = BPMN.InclusiveGateway(id=str(id(node)**32), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
         elif node.operator is Operator.INTERLEAVING:
             # TODO check which operator to use
             raise NotImplementedError("Loop operator is not implemented yet")
@@ -76,11 +76,11 @@ def recursive_create_bpmn(node: CollaborationGraphNode, parent: Union[BPMN.BPMNN
                 last_node = first_node
             if parent is not None:
                 if new_node != first_node:
-                    new_flow = BPMN.Flow(source=new_node, target=first_node, id=id(id(new_node) ** 32 + id(first_node)))
+                    new_flow = BPMN.Flow(source=new_node, target=first_node, id=str(id(new_node) ** 32 + id(first_node)), process=new_node.process)
                     bpmn.add_flow(new_flow)
                 if closing_node is not None:
                     if last_node != closing_node:
-                        new_flow = BPMN.Flow(source=last_node, target=closing_node, id=id(id(last_node) ** 32 + id(closing_node)))
+                        new_flow = BPMN.Flow(source=last_node, target=closing_node, id=str(id(last_node) ** 32 + id(closing_node)), process=last_node.process)
                         bpmn.add_flow(new_flow)
     return new_node, closing_node
 
@@ -96,7 +96,7 @@ def add_message_flows(graph: CollaborationGraph, bpmn: BPMN):
         if source == target:
             continue
         if find_flow(source, target, bpmn) is None:
-            new_flow = BPMN.MessageFlow(source=source, target=target, id=id(id(source) ** 32 + id(target)))
+            new_flow = BPMN.MessageFlow(source=source, target=target, id=str(id(source) ** 32 + id(target)), process=source.process)
             bpmn.add_flow(new_flow)
 
 
@@ -109,9 +109,9 @@ def my_convert_to_bpmn(graph: CollaborationGraph) -> BPMN:
             if flow.get_source() == node and node in closing_nodes:
                 closing_nodes.remove(node)
     for node in closing_nodes:
-        new_node = BPMN.EndEvent()
+        new_node = BPMN.EndEvent(process=node.process)
         bpmn.add_node(new_node)
-        new_flow = BPMN.Flow(source=node, target=new_node, id=id(id(node) ** 32 + id(new_node)))
+        new_flow = BPMN.Flow(source=node, target=new_node, id=str(id(node) ** 32 + id(new_node)), process=node.process)
         bpmn.add_flow(new_flow)
     add_message_flows(graph, bpmn)
     return bpmn
