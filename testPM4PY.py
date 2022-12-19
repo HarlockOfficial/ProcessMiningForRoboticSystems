@@ -38,6 +38,11 @@ def tmp_import_xes(log_name):
     pm4py.view_process_tree(single_process_tree)
 
 
+def view_bpmn_file(filepath: str):
+    bpmn = pm4py.read_bpmn(filepath)
+    pm4py.view_bpmn(bpmn)
+
+
 if __name__ == "__main__":
     import_xes(['Logs/real/hospital.xes',
                 'Logs/real/gynecologist.xes',
@@ -45,3 +50,4 @@ if __name__ == "__main__":
                 'Logs/real/patient.xes'], ['hospital', 'gynecologist', 'laboratory', 'patient'])
     
     # tmp_import_xes('Logs/real/patient.xes')
+    view_bpmn_file('test.bpmn')
