@@ -23,6 +23,19 @@ def find_flow(source: BPMN.BPMNNode, target: BPMN.BPMNNode, bpmn: BPMN) -> Union
     return None
 
 
+def build_sequence(node: CollaborationGraphNode, parent: BPMN.BPMNNode, bpmn: BPMN):
+    initial_parent = parent
+    for child in node.children:
+        first_node, last_node = recursive_create_bpmn(child, parent, bpmn)
+        if last_node is None:
+            last_node = first_node
+        new_flow = BPMN.Flow(source=parent, target=first_node, id=str(id(parent) ** 32 + id(child)),
+                             process=parent.process)
+        bpmn.add_flow(new_flow)
+        parent = last_node
+    return initial_parent, parent
+
+
 def recursive_create_bpmn(node: CollaborationGraphNode, parent: Union[BPMN.BPMNNode, None], bpmn: BPMN):
     if parent is None and not str(node.label).endswith("Start"):
         raise ValueError("The root node must be a start event")
@@ -33,39 +46,32 @@ def recursive_create_bpmn(node: CollaborationGraphNode, parent: Union[BPMN.BPMNN
     node.children = sorted(node.children, key=lambda x: x.index)
     closing_node = None
     if node.operator is not None:
-        if node.operator is Operator.XOR:
+        if node.operator in (Operator.XOR, Operator.LOOP):
             new_node = BPMN.ExclusiveGateway(id=str(id(node)), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
             closing_node = BPMN.ExclusiveGateway(id=str(id(node)**32), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
-        elif node.operator is Operator.SEQUENCE:
-            initial_parent = parent
-            for child in node.children:
-                first_node, last_node = recursive_create_bpmn(child, parent, bpmn)
-                if last_node is None:
-                    last_node = first_node
-                new_flow = BPMN.Flow(source=parent, target=first_node, id=str(id(parent) ** 32 + id(child)), process=parent.process)
+            if node.operator is Operator.LOOP:
+                new_flow = BPMN.Flow(source=closing_node, target=new_node,
+                                     id=str(id(closing_node) ** 32 + id(new_node)), process=closing_node.process)
                 bpmn.add_flow(new_flow)
-                parent = last_node
-            return initial_parent, parent
-        elif node.operator is Operator.PARALLEL:
+                new_node, _ = build_sequence(node, new_node, bpmn)
+        elif node.operator is Operator.SEQUENCE:
+            return build_sequence(node, parent, bpmn)
+        elif node.operator in (Operator.PARALLEL, Operator.INTERLEAVING):
             new_node = BPMN.ParallelGateway(id=str(id(node)), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
             closing_node = BPMN.ParallelGateway(id=str(id(node)**32), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
-        elif node.operator is Operator.LOOP:
-            # TODO check which operator to use
-            raise NotImplementedError("Loop operator is not implemented yet")
         elif node.operator is Operator.OR:
             new_node = BPMN.InclusiveGateway(id=str(id(node)), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
             closing_node = BPMN.InclusiveGateway(id=str(id(node)**32), gateway_direction=BPMN.Gateway.Direction.CONVERGING, process=node.process)
-        elif node.operator is Operator.INTERLEAVING:
-            # TODO check which operator to use
-            raise NotImplementedError("Loop operator is not implemented yet")
         elif node.operator is Operator.RECEIVE_MESSAGE:
-            raise NotImplementedError("Receive message not implemented")
+            raise NotImplementedError("Receive message can never be implemented")
         elif node.operator is Operator.SEND_MESSAGE:
-            raise NotImplementedError("Send message not implemented")
+            raise NotImplementedError("Send message can never be implemented")
         else:
             raise ValueError("Unknown operator")
     if parent is not None:
         bpmn.add_node(new_node)
+    if closing_node is not None:
+        bpmn.add_node(closing_node)
     if node.operator is not None or isinstance(new_node, BPMN.StartEvent):
         for child in node.children:
             first_node = find_node(child, bpmn)
