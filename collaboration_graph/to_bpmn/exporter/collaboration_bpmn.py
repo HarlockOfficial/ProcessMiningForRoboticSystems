@@ -1,8 +1,11 @@
 import uuid
 import xml.etree.ElementTree as ElementTree
+from typing import Dict
 
 from pm4py.objects.bpmn.obj import BPMN
 from pm4py.util import constants
+
+from collaboration_graph.to_bpmn.data_structure import EventBasedGateway, ReceiveMessageActivity, SendMessageActivity
 
 
 def apply(bpmn_graph, target_path, _=None):
@@ -24,28 +27,25 @@ def apply(bpmn_graph, target_path, _=None):
     f.close()
 
 
-def add_participants(graph: BPMN, definitions: ElementTree.SubElement):
+def add_participants(definitions: ElementTree.SubElement, process_set: set):
     """
     Adds the participants to the collaboration
 
     Parameters
     -------------
-    graph
-        BPMN diagram
     definitions
         ElementTree.SubElement element
+    process_set
+        Set of processes
     """
-    participants = set()
-    for node in graph.get_nodes():
-        participants.add(node.process)
-    for participant in participants:
+    for participant in process_set:
         participant_element = ElementTree.SubElement(definitions, "bpmn:participant")
         participant_element.set("id", "Participant_" + str(uuid.uuid4()))
         participant_element.set("processRef", "Process_" + participant)
         participant_element.set("name", participant)
 
 
-def add_message_flows(graph: BPMN, definitions: ElementTree.SubElement):
+def add_message_flows(graph: BPMN, definitions: ElementTree.SubElement, nodes_map: Dict[str, Dict[int, str]], flows_map: Dict[int, Dict[int, str]]):
     """
     Adds the message flows to the collaboration
 
@@ -55,20 +55,36 @@ def add_message_flows(graph: BPMN, definitions: ElementTree.SubElement):
         BPMN diagram
     definitions
         ElementTree.SubElement element
+    nodes_map
+        Dictionary that maps the nodes to the nodes id
+    flows_map
+        Dictionary that maps the flows to the flows id
     """
     for edge in graph.get_flows():
-        if edge.source.process == edge.target.process:
+        source = edge.source
+        target = edge.target
+        if source.process == target.process:
             continue
+        message_flow_id = "MessageFlow_" + str(uuid.uuid4())
+
+        if source.id not in flows_map.keys():
+            flows_map[source.id] = dict()
+
+        flows_map[source.id][target.id] = message_flow_id
+
+        source_id = nodes_map[source.process][source.id]
+        target_id = nodes_map[target.process][target.id]
+
         message_flow = ElementTree.SubElement(definitions, "bpmn:messageFlow")
-        message_flow.set("id", "MessageFlow_" + str(uuid.uuid4()))
-        message_flow.set("name", edge.source.name)
-        message_flow.set("sourceRef", "Activity_" + str(edge.source.id))
-        message_flow.set("targetRef", "Activity_" + str(edge.target.id))
+
+        message_flow.set("id", message_flow_id)
+        message_flow.set("sourceRef", source_id)
+        message_flow.set("targetRef", target_id)
         if edge.source.name is not None:
             message_flow.set("name", edge.source.name)
 
 
-def add_processes(graph: BPMN, definitions: ElementTree.SubElement):
+def add_processes(graph: BPMN, definitions: ElementTree.SubElement, process_set: set, nodes_map: Dict[str, Dict[int, str]], flows_map: Dict[int, Dict[int, str]]):
     """
     Adds the processes to the collaboration
 
@@ -78,12 +94,15 @@ def add_processes(graph: BPMN, definitions: ElementTree.SubElement):
         BPMN diagram
     definitions
         ElementTree.SubElement element
+    process_set
+        Set of processes
+    nodes_map
+        Dictionary that maps the nodes to the nodes id
+    flows_map
+        Dictionary that maps the flows to the flows id
     """
-    all_processes = set()
-    for node in graph.get_nodes():
-        all_processes.add(node.process)
     process_process = dict()
-    for process_name in all_processes:
+    for process_name in process_set:
         p = ElementTree.SubElement(definitions, "bpmn:process")
         p.set("id", "Process_" + process_name)
         p.set("isClosed", "false")
@@ -91,8 +110,12 @@ def add_processes(graph: BPMN, definitions: ElementTree.SubElement):
         p.set("processType", "None")
         process_process[process_name] = p
 
+    task_map = dict()
     for node in graph.get_nodes():
         process = process_process[node.process]
+
+        task_id = "Activity_" + str(node.id)
+        task = ElementTree.SubElement(process, "bpmn:task")
 
         if isinstance(node, BPMN.StartEvent):
             is_interrupting = "true" if node.get_isInterrupting() else "false"
@@ -100,75 +123,107 @@ def add_processes(graph: BPMN, definitions: ElementTree.SubElement):
             task = ElementTree.SubElement(process, "bpmn:startEvent")
             task.set("isInterrupting", is_interrupting)
             task.set("parallelMultiple", parallel_multiple)
+            task_id = "StartEvent_" + str(node.id)
         elif isinstance(node, BPMN.EndEvent):
             task = ElementTree.SubElement(process, "bpmn:endEvent")
+            task_id = "Event_" + str(node.id)
         elif isinstance(node, BPMN.IntermediateCatchEvent):
             task = ElementTree.SubElement(process, "bpmn:intermediateCatchEvent")
         elif isinstance(node, BPMN.IntermediateThrowEvent):
             task = ElementTree.SubElement(process, "bpmn:intermediateThrowEvent")
         elif isinstance(node, BPMN.BoundaryEvent):
             task = ElementTree.SubElement(process, "bpmn:boundaryEvent")
+        elif isinstance(node, ReceiveMessageActivity):
+            task = ElementTree.SubElement(process, "bpmn:receiveTask")
+            task_id = "Activity_" + str(node.id)
+        elif isinstance(node, SendMessageActivity):
+            task = ElementTree.SubElement(process, "bpmn:sendTask")
+            task_id = "Activity_" + str(node.id)
+        elif isinstance(node, BPMN.Activity):
+            task_id = "Activity_" + str(node.id)
         elif isinstance(node, BPMN.Task):
-            task = ElementTree.SubElement(process, "bpmn:task")
+            task_id = "Task_" + str(node.id)
         elif isinstance(node, BPMN.SubProcess):
             task = ElementTree.SubElement(process, "bpmn:subProcess")
+        elif isinstance(node, EventBasedGateway):
+            task = ElementTree.SubElement(process, "bpmn:eventBasedGateway")
+            task.set("gatewayDirection", node.get_gateway_direction().value.lower())
+            task_id = "Gateway_" + str(node.id)
         elif isinstance(node, BPMN.ExclusiveGateway):
             task = ElementTree.SubElement(process, "bpmn:exclusiveGateway")
             task.set("gatewayDirection", node.get_gateway_direction().value.lower())
+            task_id = "ExclusiveGateway_" + str(node.id)
         elif isinstance(node, BPMN.ParallelGateway):
             task = ElementTree.SubElement(process, "bpmn:parallelGateway")
             task.set("gatewayDirection", node.get_gateway_direction().value.lower())
+            task_id = "ParallelGateway_" + str(node.id)
         elif isinstance(node, BPMN.InclusiveGateway):
             task = ElementTree.SubElement(process, "bpmn:inclusiveGateway")
             task.set("gatewayDirection", node.get_gateway_direction().value.lower())
+            task_id = "InclusiveGateway_" + str(node.id)
         else:
             raise Exception("Unexpected node type.")
 
-        task.set("id", "Activity_" + str(node.id))
+        task.set("id", task_id)
         if node.name is not None:
             task.set("name", node.name)
         else:
             task.set("name", "")
 
-        for in_arc in node.get_in_arcs():
-            arc_xml = ElementTree.SubElement(task, "bpmn:incoming")
-            arc_xml.text = "Flow_" + str(in_arc.get_id())
+        if node.process not in nodes_map.keys():
+            nodes_map[node.process] = dict()
 
-        for out_arc in node.get_out_arcs():
-            arc_xml = ElementTree.SubElement(task, "bpmn:outgoing")
-            arc_xml.text = "Flow_" + str(out_arc.get_id())
+        nodes_map[node.process][node.id] = task_id
+        task_map[node.id] = task
 
     for flow in graph.get_flows():
-        process = process_process[flow.get_process()]
-
         source = flow.get_source()
         target = flow.get_target()
+        if source.process != target.process:
+            continue
+        process = process_process[source.process]
+
+        flow_id = "SequenceFlow_" + str(uuid.uuid4())
+
+        if source.id not in flows_map.keys():
+            flows_map[source.id] = dict()
+
+        if target.id not in flows_map.keys():
+            flows_map[target.id] = dict()
+
+        flows_map[source.id][target.id] = flow_id
+
+        source_id = nodes_map[source.process][source.id]
+        target_id = nodes_map[target.process][target.id]
+
         flow_xml = ElementTree.SubElement(process, "bpmn:sequenceFlow")
-        flow_xml.set("id", "Flow_" + str(flow.get_id()))
-        flow_xml.set("sourceRef", "Activity_" + str(source.id))
-        flow_xml.set("targetRef", "Activity_" + str(target.id))
+        flow_xml.set("id", flow_id)
+        flow_xml.set("sourceRef", source_id)
+        flow_xml.set("targetRef", target_id)
         if flow.get_source().name is not None:
             flow_xml.set("name", flow.get_source().name)
 
-
-def add_diagram(graph: BPMN, diagram: ElementTree.SubElement, collaboration_id: str):
-    all_processes = set()
     for node in graph.get_nodes():
-        all_processes.add(node.process)
+        task = task_map[node.id]
+        for sender_node_id in flows_map.keys():
+            for receiver_node_id in flows_map[sender_node_id].keys():
+                if receiver_node_id == node.id:
+                    flow_id = flows_map[sender_node_id][receiver_node_id]
+                    arc_xml = ElementTree.SubElement(task, "bpmn:incoming")
+                    arc_xml.text = flow_id
 
-    process_planes = dict()
-    for process in all_processes:
-        plane = ElementTree.SubElement(diagram, "bpmndi:BPMNPlane")
-        plane.set("bpmnElement", collaboration_id)
-        plane.set("id", "BPMNPlane_" + process + "_plane")
-        process_planes[process] = plane
+        for out_node_id in flows_map[node.id]:
+            flow_id = flows_map[node.id][out_node_id]
+            arc_xml = ElementTree.SubElement(task, "bpmn:outgoing")
+            arc_xml.text = flow_id
 
+
+def add_diagram(graph: BPMN, process_plane: ElementTree.SubElement, nodes_map: Dict[str, Dict[int, str]], flows_map: Dict[int, Dict[int, str]]):
     for node in graph.get_nodes():
-        process = node.get_process()
-
-        node_shape = ElementTree.SubElement(process_planes[process], "bpmndi:BPMNShape")
-        node_shape.set("bpmnElement", "Activity_" + str(node.id))
-        node_shape.set("id", "BPMNShape_" + str(node.id) + "_shape")
+        node_shape = ElementTree.SubElement(process_plane, "bpmndi:BPMNShape")
+        node_id = nodes_map[node.process][node.id]
+        node_shape.set("bpmnElement", node_id)
+        node_shape.set("id", "BPMNShape_" + node_id + "_shape")
 
         node_shape_layout = ElementTree.SubElement(node_shape, "dc:Bounds")
         node_shape_layout.set("height", str(node.get_height()))
@@ -177,11 +232,12 @@ def add_diagram(graph: BPMN, diagram: ElementTree.SubElement, collaboration_id: 
         node_shape_layout.set("y", str(node.get_y()))
 
     for flow in graph.get_flows():
-        process = flow.get_process()
-
-        flow_shape = ElementTree.SubElement(process_planes[process], "bpmndi:BPMNEdge")
-        flow_shape.set("bpmnElement", "Flow_" + str(flow.get_id()))
-        flow_shape.set("id", "Flow_" + str(flow.get_id()) + "_edge")
+        source = flow.source
+        target = flow.target
+        flow_id = flows_map[source.id][target.id]
+        flow_shape = ElementTree.SubElement(process_plane, "bpmndi:BPMNEdge")
+        flow_shape.set("bpmnElement", flow_id)
+        flow_shape.set("id", flow_id + "_edge")
 
         for x, y in flow.get_waypoints():
             waypoint = ElementTree.SubElement(flow_shape, "di:waypoint")
@@ -205,18 +261,30 @@ def get_xml_string(bpmn_graph, _=None):
     definitions.set("expressionLanguage", "http://www.w3.org/1999/XPath")
     definitions.set("xmlns:xsd", "http://www.w3.org/2001/XMLSchema")
 
-    diagram = ElementTree.SubElement(definitions, "bpmndi:BPMNDiagram")
-    diagram.set("id", "BPMNDiagram_" + str(uuid.uuid4()))
-    diagram.set("name", "diagram")
+    flows_map = dict()
+    nodes_map = dict()
+    process_set = set()
+    for node in bpmn_graph.get_nodes():
+        process_set.add(node.process)
 
     collaboration = ElementTree.SubElement(definitions, "bpmn:collaboration")
     collaboration_id = "Collaboration_" + str(uuid.uuid4())
     collaboration.set("id", collaboration_id)
     collaboration.set("name", "collaboration")
 
-    add_participants(bpmn_graph, collaboration)
-    add_message_flows(bpmn_graph, collaboration)
-    add_processes(bpmn_graph, definitions)
-    add_diagram(bpmn_graph, diagram, collaboration_id)
+    add_participants(collaboration, process_set)
+
+    add_processes(bpmn_graph, definitions, process_set, nodes_map, flows_map)
+    add_message_flows(bpmn_graph, collaboration, nodes_map, flows_map)
+
+    diagram = ElementTree.SubElement(definitions, "bpmndi:BPMNDiagram")
+    diagram.set("id", "BPMNDiagram_" + str(uuid.uuid4()))
+    diagram.set("name", "diagram")
+
+    plane = ElementTree.SubElement(diagram, "bpmndi:BPMNPlane")
+    plane.set("bpmnElement", collaboration_id)
+    plane.set("id", "BPMNPlane_" + str(uuid.uuid4()) + "_plane")
+
+    add_diagram(bpmn_graph, plane, nodes_map, flows_map)
 
     return minidom.parseString(ElementTree.tostring(definitions)).toprettyxml(encoding=constants.DEFAULT_ENCODING)
