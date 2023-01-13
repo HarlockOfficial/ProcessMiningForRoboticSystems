@@ -5,7 +5,7 @@ from pm4py.objects.process_tree.obj import ProcessTree
 
 
 class CollaborationGraphNode(object):
-    def __init__(self, process: str, label: str = None, node: ProcessTree = None, index: int = -1):
+    def __init__(self, process: str = None, label: str = None, node: ProcessTree = None, index: int = -1):
         self.label = label
         if node is not None:
             self.operator = node.operator
