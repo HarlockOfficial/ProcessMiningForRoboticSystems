@@ -83,6 +83,14 @@ class CollaborationGraph(object):
                 return False
         return True
 
+    def __hash__(self):
+        hash_val = 0
+        for index, node in enumerate(self.nodes):
+            hash_val += hash(node) * (index + 1)
+        for index, edge in enumerate(self.edges):
+            hash_val += hash(edge) * (index + 1)
+        return hash_val
+
     def get_node(self, node: Union[ProcessTree, str, CollaborationGraphNode]) -> CollaborationGraphNode:
         if isinstance(node, ProcessTree) or isinstance(node, CollaborationGraphNode):
             for my_node in self.nodes:

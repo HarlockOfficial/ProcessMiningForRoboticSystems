@@ -3,18 +3,19 @@ import pm4py
 
 
 class MyOperator(Enum):
+    from pm4py.objects.process_tree.obj import Operator
     # sequence operator
-    SEQUENCE = '->'
+    SEQUENCE = Operator.SEQUENCE
     # exclusive choice operator
-    XOR = 'X'
+    XOR = Operator.XOR
     # parallel operator
-    PARALLEL = '+'
+    PARALLEL = Operator.PARALLEL
     # loop operator
-    LOOP = '*'
+    LOOP = Operator.LOOP
     # or operator
-    OR = 'O'
+    OR = Operator.OR
     # interleaving operator
-    INTERLEAVING = "<>"
+    INTERLEAVING = Operator.INTERLEAVING
 
     RECEIVE_MESSAGE = "receive_message"
 
@@ -43,4 +44,4 @@ class MyOperator(Enum):
         return self.value
 
 
-pm4py.objects.process_tree.obj.Operator = MyOperator
+# pm4py.objects.process_tree.obj.Operator = MyOperator

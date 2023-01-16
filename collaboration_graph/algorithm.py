@@ -33,7 +33,7 @@ def to_collaboration_graph(node: ProcessTree, process_name: str, child_index: in
             graph, new_lst = to_collaboration_graph(child, process_name=process_name, child_index=index, parent=graph_node, graph=graph,
                                                     to_add_edges=to_add_edges)
             to_add_edges.extend(new_lst)
-    elif node.operator == Operator.RECEIVE_MESSAGE:
+    elif node.operator == MyOperator.MyOperator.RECEIVE_MESSAGE:
         graph_node = node.children[-1]
         graph_node.parent = node.parent
         graph, new_lst = to_collaboration_graph(graph_node, process_name=process_name, child_index=child_index, parent=graph_node.parent,
@@ -47,7 +47,7 @@ def to_collaboration_graph(node: ProcessTree, process_name: str, child_index: in
                 graph.add_edge(tmp_graph_node, graph_node)
             except Exception:
                 to_add_edges.append((child.label, graph_node.label))
-    elif node.operator == Operator.SEND_MESSAGE:
+    elif node.operator == MyOperator.MyOperator.SEND_MESSAGE:
         graph_node = node.children[0]
         graph_node.parent = node.parent
         graph, new_lst = to_collaboration_graph(graph_node, process_name=process_name, child_index=child_index, parent=graph_node.parent,
@@ -125,6 +125,20 @@ def clean_collaboration_graph(collaboration_graph_: CollaborationGraph) -> Colla
     return collaboration_graph_
 
 
+def fix_child_nodes_and_edges(collaboration_graph_: CollaborationGraph) -> CollaborationGraph:
+    for edge in collaboration_graph_.edges:
+        node_0 = list(filter(lambda x: x == edge[0], collaboration_graph_.nodes))
+        node_1 = list(filter(lambda x: x == edge[1], collaboration_graph_.nodes))
+        if len(node_0) == 0 or len(node_1) == 0:
+            print("Error: edge node not found in collaboration graph node list")
+            continue
+        node_0 = node_0[0]
+        node_1 = node_1[0]
+        if node_1 not in node_0.children:
+            node_0.children.append(node_1)
+    return collaboration_graph_
+
+
 def apply_collaboration_graph(process_tree_dict: Dict[str, ProcessTree]) -> CollaborationGraph:
     collaboration_tree_list = []
     all_edges_list = []
@@ -143,4 +157,5 @@ def apply_collaboration_graph(process_tree_dict: Dict[str, ProcessTree]) -> Coll
         if (node_0, node_1) not in collaboration_graph_.edges:
             collaboration_graph_.add_edge(node_0, node_1)
     collaboration_graph_ = clean_collaboration_graph(collaboration_graph_)
+    collaboration_graph_ = fix_child_nodes_and_edges(collaboration_graph_)
     return collaboration_graph_

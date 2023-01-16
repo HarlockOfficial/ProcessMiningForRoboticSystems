@@ -114,8 +114,34 @@ def my_repr_tree_2(tree, viz, color_map, parameters):
         viz.edge(str(edge[0]), str(edge[1]), dirType='normal')
 
 
+def my_get_list_nodes_from_tree(tree: CollaborationGraph, parameters) -> list:
+    """
+    Get list of nodes from a process tree
+
+    Parameters
+    -------------
+    tree
+        Process tree
+    parameters
+        Parameters of the algorithm
+    Returns
+    -------------
+    list_nodes
+        List of nodes
+    """
+    if parameters is None:
+        return []
+    tmp_tree = parameters['graph']
+    list_nodes = []
+
+    for node in tmp_tree.nodes:
+        list_nodes.append(node)
+    return list_nodes
+
+
 import pm4py.objects.process_tree.utils.generic
 
 pm4py.objects.process_tree.utils.generic.tree_sort = my_tree_sort
 pm4py.visualization.process_tree.variants.wo_decoration.apply = my_apply
 pm4py.visualization.process_tree.variants.wo_decoration.repr_tree_2 = my_repr_tree_2
+pm4py.objects.process_tree.exporter.variants.ptml.get_list_nodes_from_tree = my_get_list_nodes_from_tree

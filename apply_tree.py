@@ -173,7 +173,7 @@ def my_apply_tree(log: List[EventLog], process_names: List[str], parameters) -> 
         remove_double_edges(process_tree[process_names[index]])
         # Ensures consistency to the parent pointers in the process tree
         tree_consistency.fix_parent_pointers(process_tree[process_names[index]])
-        # Fixes a 1 child XOR that is added when single-activities flowers are found
+        # Fixes a healthcare child XOR that is added when single-activities flowers are found
         tree_consistency.fix_one_child_xor_flower(process_tree[process_names[index]])
         # folds the process tree (to simplify it in case fallthroughs/filtering is applied)
         process_tree[process_names[index]] = generic.fold(process_tree[process_names[index]])
@@ -205,9 +205,9 @@ def get_tree_repr_implain_get_repr(spec_tree_struct, rec_depth, contains_empty_t
         elif spec_tree_struct.detected_cut == "parallel":
             final_tree_repr = ProcessTree(operator=Operator.PARALLEL)
         elif spec_tree_struct.detected_cut == "receive_message_activity":
-            final_tree_repr = ProcessTree(operator=Operator.RECEIVE_MESSAGE)
+            final_tree_repr = ProcessTree(operator=MyOperator.MyOperator.RECEIVE_MESSAGE)
         elif spec_tree_struct.detected_cut == "send_message_activity":
-            final_tree_repr = ProcessTree(operator=Operator.SEND_MESSAGE)
+            final_tree_repr = ProcessTree(operator=MyOperator.MyOperator.SEND_MESSAGE)
         
         if not (spec_tree_struct.detected_cut == "loopCut" and len(spec_tree_struct.children) >= 3):
             for ch in spec_tree_struct.children:

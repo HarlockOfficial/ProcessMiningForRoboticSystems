@@ -133,7 +133,7 @@ def check_event_based_gateway(node: BPMN.BPMNNode) -> bool:
     for outgoing_flow in node.out_arcs:
         if not isinstance(outgoing_flow.target, ReceiveMessageActivity):
             return True
-    return False
+    return not isinstance(node, BPMN.ExclusiveGateway) and not isinstance(node, BPMN.InclusiveGateway)
 
 
 def check_send_message_activities(node: BPMN.BPMNNode) -> bool:
