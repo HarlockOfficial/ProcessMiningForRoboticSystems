@@ -27,7 +27,68 @@ def apply(bpmn_graph, target_path, _=None):
     f.close()
 
 
-def add_participants(definitions: ElementTree.SubElement, process_set: set):
+def get_participant_layout(nodes_list: list, participant: str) -> (int, int, int, int):
+    """
+    Gets the layout of the participant
+
+    Parameters
+    -------------
+    nodes_list
+        List of nodes
+    participant
+        Participant
+
+    Returns
+    -------------
+    height
+        Height of the participant
+    width
+        Width of the participant
+    x
+        X coordinate of the participant
+    y
+        Y coordinate of the participant
+    """
+    min_x = float('inf')
+    max_x = float('-inf')
+    min_y = float('inf')
+    max_y = float('-inf')
+    for node in nodes_list:
+        if node.process == participant:
+            x = node.get_x()
+            y = node.get_y()
+            min_x = min(min_x, x)
+            max_x = max(max_x, x)
+            min_y = min(min_y, y)
+            max_y = max(max_y, y)
+
+    if min_x == float('inf'):
+        min_x = 0
+    if max_x == float('-inf'):
+        max_x = 0
+    if min_y == float('inf'):
+        min_y = 0
+    if max_y == float('-inf'):
+        max_y = 0
+
+    orig_min_x = min_x
+    orig_min_y = min_y
+    if max_x < 0 and min_x < 0:
+        max_x, min_x = abs(min_x), abs(max_x)
+    if max_y < 0 and min_y < 0:
+        max_y, min_y = abs(min_y), abs(max_y)
+
+    height = max_y - min_y + 150
+    width = max_x - min_x + 150
+
+    y_center = orig_min_y - 75
+    x_center = orig_min_x - 75
+
+    return height, width, int(x_center), int(y_center)
+
+
+def add_participants(definitions: ElementTree.SubElement, plane: ElementTree.SubElement, process_set: set,
+                     nodes_list: list):
     """
     Adds the participants to the collaboration
 
@@ -35,17 +96,33 @@ def add_participants(definitions: ElementTree.SubElement, process_set: set):
     -------------
     definitions
         ElementTree.SubElement element
+    plane
+        ElementTree.SubElement element
     process_set
         Set of processes
+    nodes_list
+        List of nodes
     """
     for participant in process_set:
+        participant_id = "Participant_" + str(uuid.uuid4())
         participant_element = ElementTree.SubElement(definitions, "bpmn:participant")
-        participant_element.set("id", "Participant_" + str(uuid.uuid4()))
+        participant_element.set("id", participant_id)
         participant_element.set("processRef", "Process_" + participant)
         participant_element.set("name", participant)
+        participant_plane = ElementTree.SubElement(plane, "bpmndi:BPMNShape")
+        participant_plane.set("bpmnElement", participant_id)
+        participant_plane.set("id", participant_id + "_shape")
+        participant_plane.set("isHorizontal", "true")
+        participant_plane_layout = ElementTree.SubElement(participant_plane, "dc:Bounds")
+        height, width, x, y = get_participant_layout(nodes_list, participant)
+        participant_plane_layout.set("height", str(height))
+        participant_plane_layout.set("width", str(width))
+        participant_plane_layout.set("x", str(x))
+        participant_plane_layout.set("y", str(y))
 
 
-def add_message_flows(graph: BPMN, definitions: ElementTree.SubElement, nodes_map: Dict[str, Dict[int, str]], flows_map: Dict[int, Dict[int, str]]):
+def add_message_flows(graph: BPMN, definitions: ElementTree.SubElement, nodes_map: Dict[str, Dict[int, str]],
+                      flows_map: Dict[int, Dict[int, str]]):
     """
     Adds the message flows to the collaboration
 
@@ -84,7 +161,8 @@ def add_message_flows(graph: BPMN, definitions: ElementTree.SubElement, nodes_ma
             message_flow.set("name", edge.source.name)
 
 
-def add_processes(graph: BPMN, definitions: ElementTree.SubElement, process_set: set, nodes_map: Dict[str, Dict[int, str]], flows_map: Dict[int, Dict[int, str]]):
+def add_processes(graph: BPMN, definitions: ElementTree.SubElement, process_set: set,
+                  nodes_map: Dict[str, Dict[int, str]], flows_map: Dict[int, Dict[int, str]]):
     """
     Adds the processes to the collaboration
 
@@ -124,6 +202,8 @@ def add_processes(graph: BPMN, definitions: ElementTree.SubElement, process_set:
             task.set("isInterrupting", is_interrupting)
             task.set("parallelMultiple", parallel_multiple)
             task_id = "StartEvent_" + str(node.id)
+            inner_element = ElementTree.SubElement(task, "bpmn:messageEventDefinition")
+            inner_element.set("id", "MessageEventDefinition_" + str(uuid.uuid4()))
         elif isinstance(node, BPMN.EndEvent):
             task = ElementTree.SubElement(process, "bpmn:endEvent")
             task_id = "Event_" + str(node.id)
@@ -218,7 +298,8 @@ def add_processes(graph: BPMN, definitions: ElementTree.SubElement, process_set:
             arc_xml.text = flow_id
 
 
-def add_diagram(graph: BPMN, process_plane: ElementTree.SubElement, nodes_map: Dict[str, Dict[int, str]], flows_map: Dict[int, Dict[int, str]]):
+def add_diagram(graph: BPMN, process_plane: ElementTree.SubElement, nodes_map: Dict[str, Dict[int, str]],
+                flows_map: Dict[int, Dict[int, str]]):
     for node in graph.get_nodes():
         node_shape = ElementTree.SubElement(process_plane, "bpmndi:BPMNShape")
         node_id = nodes_map[node.process][node.id]
@@ -272,11 +353,6 @@ def get_xml_string(bpmn_graph, _=None):
     collaboration.set("id", collaboration_id)
     collaboration.set("name", "collaboration")
 
-    add_participants(collaboration, process_set)
-
-    add_processes(bpmn_graph, definitions, process_set, nodes_map, flows_map)
-    add_message_flows(bpmn_graph, collaboration, nodes_map, flows_map)
-
     diagram = ElementTree.SubElement(definitions, "bpmndi:BPMNDiagram")
     diagram.set("id", "BPMNDiagram_" + str(uuid.uuid4()))
     diagram.set("name", "diagram")
@@ -284,6 +360,11 @@ def get_xml_string(bpmn_graph, _=None):
     plane = ElementTree.SubElement(diagram, "bpmndi:BPMNPlane")
     plane.set("bpmnElement", collaboration_id)
     plane.set("id", "BPMNPlane_" + str(uuid.uuid4()) + "_plane")
+
+    add_participants(collaboration, plane, process_set, bpmn_graph.get_nodes())
+
+    add_processes(bpmn_graph, definitions, process_set, nodes_map, flows_map)
+    add_message_flows(bpmn_graph, collaboration, nodes_map, flows_map)
 
     add_diagram(bpmn_graph, plane, nodes_map, flows_map)
 
