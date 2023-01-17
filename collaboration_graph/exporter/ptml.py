@@ -2,8 +2,9 @@ import copy
 import uuid
 
 from lxml import etree
-from pm4py.objects.process_tree.obj import Operator, ProcessTree
+from pm4py.objects.process_tree.obj import Operator
 from pm4py.util import constants
+
 from collaboration_graph import CollaborationGraph
 
 
@@ -60,7 +61,9 @@ def export_ptree_tree(tree, parameters=None):
     # just add a skip as third child
     for node in nodes:
         if node.operator == Operator.LOOP and len(node.children) < 3:
-            third_children = ProcessTree(operator=None, label=None)
+            from collaboration_graph import CollaborationGraphNode
+            third_children = CollaborationGraphNode(process=node.process, label='Tau' + uuid.uuid4().hex,
+                                                    index=len(node.children))
             third_children.parent = node
             node.children.append(third_children)
             nodes_dict[(id(third_children), third_children)] = str(uuid.uuid4())

@@ -26,6 +26,9 @@ def import_xes(file_path: List[str], process_names: List[str], output_file_path_
     process_tree_dict = apply_tree.my_apply_im_f(event_log, process_names, parameters=params)
     import collaboration_graph
     collaboration_graph_ = collaboration_graph.algorithm.apply_collaboration_graph(process_tree_dict)
+    # viz = collaboration_graph.view_graph.my_apply(collaboration_graph_)
+    # from pm4py.visualization.process_tree import visualizer as pt_visualizer
+    # pt_visualizer.view(viz)
     collaboration_graph.exporter.apply(
         collaboration_graph_.get_root(), output_file_path_process_tree, parameters={'graph': collaboration_graph_})
     bpmn = collaboration_graph.to_bpmn.algorithm.my_convert_to_bpmn(collaboration_graph_)

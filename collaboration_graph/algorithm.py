@@ -7,7 +7,15 @@ from typing import List, Tuple, Dict
 
 from pm4py.objects.process_tree.obj import ProcessTree
 
+import logger
 from collaboration_graph.data_structure import CollaborationGraph, CollaborationGraphNode
+
+
+def remove_duplicate_edges(edges_list: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    for edge in edges_list:
+        if edges_list.count(edge) > 1:
+            edges_list.remove(edge)
+    return edges_list
 
 
 def to_collaboration_graph(node: ProcessTree, process_name: str, child_index: int = -1, parent: CollaborationGraphNode = None,
@@ -61,11 +69,19 @@ def to_collaboration_graph(node: ProcessTree, process_name: str, child_index: in
                 graph.add_edge(graph_node, tmp_graph_node)
             except Exception:
                 to_add_edges.append((graph_node.label, child.label))
+    elif node.operator is None and node.label is None:
+        # Processing Tau node
+        graph_node = CollaborationGraphNode(label="Tau" + uuid.uuid4().hex, index=child_index, process=process_name)
+        graph.add_node(graph_node)
+        graph.add_edge(start_node, graph_node)
     elif node.operator is None and node.label is not None:
         graph_node = CollaborationGraphNode(node=node, index=child_index, process=process_name)
         if start_node.label != graph_node.label:
             graph.add_node(graph_node)
             graph.add_edge(start_node, graph_node)
+    else:
+        raise Exception("Impossible node type")
+    to_add_edges = remove_duplicate_edges(to_add_edges)
     return graph, to_add_edges
 
 
@@ -130,7 +146,7 @@ def fix_child_nodes_and_edges(collaboration_graph_: CollaborationGraph) -> Colla
         node_0 = list(filter(lambda x: x == edge[0], collaboration_graph_.nodes))
         node_1 = list(filter(lambda x: x == edge[1], collaboration_graph_.nodes))
         if len(node_0) == 0 or len(node_1) == 0:
-            print("Error: edge node not found in collaboration graph node list")
+            logger.logger.error("Error: edge node not found in collaboration graph node list")
             continue
         node_0 = node_0[0]
         node_1 = node_1[0]

@@ -42,7 +42,7 @@ def build_sequence(node: CollaborationGraphNode, parent: BPMN.BPMNNode, bpmn: BP
 def recursive_create_bpmn(node: CollaborationGraphNode, parent: Union[BPMN.BPMNNode, None], bpmn: BPMN):
     if parent is None and not str(node.label).endswith("Start"):
         raise ValueError("The root node must be a start event")
-    if str(node.label).startswith("Start") or str(node.label).endswith("Start"):
+    if (str(node.label).startswith("Start") or str(node.label).endswith("Start")) and len(str(node.label)) > 10:
         new_node = BPMN.NormalStartEvent(id=str(id(node)), process=node.process)
     else:
         new_node = BPMN.Task(id=str(id(node)), name=node.label, process=node.process)

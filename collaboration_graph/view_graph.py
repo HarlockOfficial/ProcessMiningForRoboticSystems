@@ -9,7 +9,6 @@ from pm4py.objects.process_tree.obj import Operator
 from pm4py.util import exec_utils
 from pm4py.utils import constants
 from pm4py.visualization.process_tree.variants.wo_decoration import get_color, Parameters
-from pydotplus import graphviz
 
 from collaboration_graph import CollaborationGraph
 
