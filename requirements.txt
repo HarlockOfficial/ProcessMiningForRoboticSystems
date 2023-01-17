@@ -3,3 +3,4 @@ graphviz==0.20.1
 networkx==2.8.8
 requests~=2.28.2
 pydotplus~=2.0.2
+lxml~=4.9.2
