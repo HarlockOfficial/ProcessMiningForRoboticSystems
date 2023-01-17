@@ -29,7 +29,7 @@ def apply(bpmn_graph: BPMN) -> BPMN:
 
     nodes_dict = {}
     inv_nodes_dict = {}
-    subgraphs = dict()
+    sub_graphs = dict()
     sub_graph_edges = dict()
     other_edges = []
 
@@ -39,20 +39,20 @@ def apply(bpmn_graph: BPMN) -> BPMN:
         inv_nodes_dict[node_uuid] = n
         viz.node(node_uuid, label=" ", shape="box")
 
-    for tup in graph_edges:
-        if tup[0].process == tup[1].process:
-            if tup[0].process not in sub_graph_edges:
-                sub_graph_edges[tup[0].process] = []
-            sub_graph_edges[tup[0].process].append((nodes_dict[tup[0]], nodes_dict[tup[1]]))
+    for source, destination in graph_edges:
+        if source.process == destination.process:
+            if source.process not in sub_graph_edges.keys():
+                sub_graph_edges[source.process] = list()
+            sub_graph_edges[source.process].append((nodes_dict[source], nodes_dict[destination]))
         else:
-            other_edges.append((nodes_dict[tup[0]], nodes_dict[tup[1]]))
+            other_edges.append((nodes_dict[source], nodes_dict[destination]))
 
     for node in graph_nodes:
-        if node.process not in subgraphs.keys():
+        if node.process not in sub_graphs.keys():
             with viz.subgraph(name='cluster_' + node.process) as sub:
                 sub.attr(label=node.process)
                 sub.edges(sub_graph_edges[node.process])
-                subgraphs[node.process] = sub
+                sub_graphs[node.process] = sub
 
     for edge in other_edges:
         viz.edge(edge[0], edge[1])
