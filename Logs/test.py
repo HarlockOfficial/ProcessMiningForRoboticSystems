@@ -7,7 +7,7 @@ import testPM4PY
 
 
 def download_file_content(url):
-    base_url = 'https://bitbucket.org/proslabteam/colliery_validation/raw/74d06e1b38f9f8941a3e5ca24617f5ba5dd95e7e/'
+    base_url = 'https://bitbucket.org/proslabteam/colliery_validation/raw/b45b1a2287eb1c503fccd275e76359516b482d42/'
     response = requests.get(base_url + url)
     if response.status_code != 200:
         logger.logger.warning(response.status_code, response.reason)

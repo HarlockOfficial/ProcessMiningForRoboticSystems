@@ -22,9 +22,9 @@ def apply(bpmn_graph, target_path, _=None):
         Possible parameters of the algorithm
     """
     xml_string = get_xml_string(bpmn_graph)
-    f = open(target_path, "wb")
-    f.write(xml_string)
-    f.close()
+    xml_string = xml_string.replace(b"<bpmn:task />", b"")
+    with open(target_path, "wb") as f:
+        f.write(xml_string)
 
 
 def get_participant_layout(nodes_list: list, participant: str) -> (int, int, int, int):
