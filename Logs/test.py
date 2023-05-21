@@ -24,6 +24,9 @@ def create_path(path):
 
 def main(download_tests=True, run_tests=True):
     test_file_list = [
+        ('artificial1/PartyA.xes', 'generated/1/party_a.xes'),
+        ('artificial1/PartyC.xes', 'generated/1/party_c.xes'),
+        ('artificial1/model.bpmn', 'generated/1/final.bpmn'),
         ('artificial2/PartyA.xes', 'generated/2/party_a.xes'),
         ('artificial2/PartyB.xes', 'generated/2/party_b.xes'),
         ('artificial2/model.bpmn', 'generated/2/final.bpmn'),
@@ -39,21 +42,18 @@ def main(download_tests=True, run_tests=True):
         ('artificial5/PartyC.xes', 'generated/5/party_c.xes'),
         ('artificial5/PartyD.xes', 'generated/5/party_d.xes'),
         ('artificial5/model.bpmn', 'generated/5/final.bpmn'),
-        ('helathcare/Hospital.xes', 'healthcare/hospital.xes'),
-        ('helathcare/Gynecologist.xes', 'healthcare/gynecologist.xes'),
-        ('helathcare/Laboratory.xes', 'healthcare/laboratory.xes'),
-        ('helathcare/Patient.xes', 'healthcare/patient.xes'),
-        ('helathcare/model.bpmn', 'healthcare/final.bpmn'),
-        ('real1/DINGO.xes', 'real/1/dingo.xes'),
-        ('real1/REX.xes', 'real/1/rex.xes'),
-        ('real1/collaboration_discovered_inductive.bpmn', 'real/1/final.bpmn'),
+        ('real1/Hospital.xes', 'real/1/hospital.xes'),
+        ('real1/Gynecologist.xes', 'real/1/gynecologist.xes'),
+        ('real1/Laboratory.xes', 'real/1/laboratory.xes'),
+        ('real1/Patient.xes', 'real/1/patient.xes'),
+        ('real1/model.bpmn', 'real/1/final.bpmn'),
         ('real2/Customer.xes', 'real/2/customer.xes'),
         ('real2/TravelAgency.xes', 'real/2/travel_agency.xes'),
-        ('real2/collaboration_discovered_inductive.bpmn', 'real/2/final.bpmn'),
+        ('real2/model.bpmn', 'real/2/final.bpmn'),
         ('real4/Bank.xes', 'real/4/bank.xes'),
         ('real4/Visitor.xes', 'real/4/visitor.xes'),
         ('real4/Zoo.xes', 'real/4/zoo.xes'),
-        ('real4/collaboration_discovered_inductive.bpmn', 'real/4/final.bpmn'),
+        ('real4/model.bpmn', 'real/4/final.bpmn'),
     ]
     if download_tests:
         for url, path in test_file_list:
