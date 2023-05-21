@@ -23,6 +23,7 @@ def apply(bpmn_graph, target_path, _=None):
     """
     xml_string = get_xml_string(bpmn_graph)
     xml_string = xml_string.replace(b"<bpmn:task />", b"")
+    xml_string = xml_string.replace(b"<bpmn:task/>", b"")
     with open(target_path, "wb") as f:
         f.write(xml_string)
 
