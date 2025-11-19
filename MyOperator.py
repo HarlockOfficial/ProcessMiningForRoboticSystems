@@ -18,6 +18,8 @@ class MyOperator(Enum):
 
     RECEIVE_MESSAGE = "receive_message"
 
+    SEND_MESSAGE = "send_message"
+    
     def __str__(self):
         """
         Provides a string representation of the current operator

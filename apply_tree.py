@@ -1,45 +1,129 @@
+import copy
+from typing import List, Tuple
+
+import pm4py
 from pm4py import util as pmutil
 from pm4py.algo.discovery.dfg.variants import native as dfg_inst
 from pm4py.algo.discovery.inductive.util import shared_constants
 from pm4py.algo.discovery.inductive.util import tree_consistency
 from pm4py.algo.discovery.inductive.util.petri_el_count import Counts
+from pm4py.algo.discovery.inductive.variants.im.util.get_tree_repr_implain import get_transition
 from pm4py.algo.discovery.inductive.variants.im_f.algorithm import Parameters
 from pm4py.objects.log.obj import EventLog
 from pm4py.objects.log.util import filtering_utils
+import MyOperator
+from pm4py.objects.process_tree.obj import Operator
+from pm4py.objects.process_tree.obj import ProcessTree
 from pm4py.objects.process_tree.utils import generic
 from pm4py.objects.process_tree.utils.generic import tree_sort
 from pm4py.statistics.attributes.log import get as attributes_get
 from pm4py.statistics.end_activities.log import get as end_activities_get
 from pm4py.statistics.start_activities.log import get as start_activities_get
-import pm4py
-import my_subtree_infrequent
-from pm4py.objects.process_tree.obj import ProcessTree
-import MyOperator
-from pm4py.objects.process_tree.obj import Operator
 from pm4py.util import exec_utils, xes_constants
-from pm4py.algo.discovery.inductive.variants.im.util.get_tree_repr_implain import get_transition
+
+import my_subtree_infrequent
 
 
-def not_working_discover_in_nodes(log: list[EventLog], dfg: dict[EventLog, list[tuple[tuple[str, str], int]]]) -> \
-        dict[EventLog, list[tuple[tuple[str, str], int]]]:
-    sender_nodes = {}
-    sender_nodes[log[0]] = [(('PIPPO', 'Receive patient results'), 50)]
-    return sender_nodes
+def discover_in_nodes(log: List[EventLog], dfg_list: List[List[Tuple[Tuple[str, str], int]]], activity_key: str) -> \
+        Tuple[List[List[Tuple[Tuple[str, str], int]]], List[List[Tuple[Tuple[str, str], int]]]]:
+    sender_nodes = [[] for _ in range(len(dfg_list))]
+    receiver_nodes = [[] for _ in range(len(dfg_list))]
+
+    # discover receiving nodes
+    send_list = []
+    send_receive_dict = {}
+    for trace_list_1 in log:
+        for trace_list_2 in log:
+            for trace_1 in trace_list_1:
+                for trace_2 in trace_list_2:
+                    for event_1 in trace_1:
+                        if 'msgType' in event_1.keys() and event_1['msgType'] == 'send' and event_1[
+                                activity_key] not in send_receive_dict.keys():
+                            for event_2 in trace_2:
+                                if 'msgType' in event_2.keys() and event_2['msgType'] == 'receive' and event_2[
+                                        activity_key] not in send_receive_dict.keys():
+                                    if event_1['msgFlow'] == event_2['msgFlow']:
+                                        send_list.append((event_1[activity_key], event_2[activity_key]))
+                                        send_receive_dict[event_1[activity_key]] = True
+                                        send_receive_dict[event_2[activity_key]] = True
+    for elem in send_list:
+        for index, dfg in enumerate(dfg_list):
+            found_sender = -1
+            found_receiver = -1
+            for element in dfg:
+                if element[0][1] == elem[0] or element[0][0] == elem[0]:
+                    # found sender
+                    found_sender = element[1]
+                if element[0][0] == elem[1] or element[0][1] == elem[1]:
+                    # found receiver
+                    found_receiver = element[1]
+
+            if found_sender != -1:
+                dfg.append(((elem[0], elem[1]), found_sender))
+                sender_nodes[index].append(((elem[0], elem[1]), found_sender))
+
+            if found_receiver != -1:
+                dfg.append(((elem[0], elem[1]), found_receiver))
+                receiver_nodes[index].append(((elem[0], elem[1]), found_receiver))
+
+    return sender_nodes, receiver_nodes
 
 
-def discover_in_nodes(log: EventLog, dfg: list[tuple[tuple[str, str], int]]) -> list[tuple[tuple[str, str], int]]:
-    sender_nodes = [(('PIPPO', 'Receive patient results'), 50)]
-    return sender_nodes
+def remove_double_edges(tree: ProcessTree):
+    """
+    Removes double edges from the tree
+
+    Parameters
+    --------------
+    tree
+        Process tree
+    """
+    for index_1, node_1 in enumerate(tree.children):
+        for index_2, node_2 in enumerate(tree.children):
+            if index_1 != index_2 and node_1 == node_2:
+                tree.children.remove(node_2)
+
+    for child in tree.children:
+        remove_double_edges(child)
 
 
-def discover_out_nodes(log: list[EventLog], dfg: list[tuple[tuple[str, str], int]]):
-    receiver_nodes = []
-    return receiver_nodes
+def count_tau_children(tree: ProcessTree):
+    index_array = []
+    for index, child in enumerate(tree.children):
+        if child.label == 'tau' or (child.label is None and child.operator is None):
+            index_array.append(index)
+    return index_array
 
 
-def my_apply_tree(log: list[EventLog], parameters):
+def my_fix_root_xor_flower(tree: ProcessTree):
+    if tree.operator == Operator.XOR and len(tree.children) == 1:
+        tree.operator = tree.children[0].operator
+        tree.label = tree.children[0].label
+        tree.children = tree.children[0].children
+        my_fix_root_xor_flower(tree)
+    if tree.operator == Operator.XOR and len(tree.children) > 1:
+        tau_children_index = count_tau_children(tree)
+        if len(tau_children_index) > 0:
+            tree.children = [child for index, child in enumerate(tree.children) if index not in tau_children_index]
+            my_fix_root_xor_flower(tree)
+
+
+def my_apply_tree(log: List[EventLog], parameters) -> List[ProcessTree]:
     activity_key = exec_utils.get_param_value(Parameters.ACTIVITY_KEY, parameters,
                                               pmutil.xes_constants.DEFAULT_NAME_KEY)
+    '''DFG INIT'''
+    # Working with the first log
+    # log = log[0]
+    # dfg = [(k, v) for k, v in dfg_inst.apply(log, parameters=parameters).items() if v > 0]
+    # sender_nodes = discover_in_nodes(log, dfg)
+    # dfg.extend(sender_nodes)
+    dfg = []
+    for index, trace in enumerate(log):
+        tmp_dfg = [(k, v) for k, v in dfg_inst.apply(trace, parameters=parameters).items() if v > 0]
+        dfg.append(tmp_dfg)
+
+    original_dfg = copy.deepcopy(dfg)
+    receiver_nodes, sender_nodes = discover_in_nodes(log, dfg, activity_key)
 
     for index, trace in enumerate(log):
         # keep only the activity attribute (since the others are not used)
@@ -48,57 +132,55 @@ def my_apply_tree(log: list[EventLog], parameters):
     noise_threshold = exec_utils.get_param_value(Parameters.NOISE_THRESHOLD, parameters,
                                                  shared_constants.NOISE_THRESHOLD_IMF)
 
-    '''DFG INIT'''
-    log = log[0]
-    dfg = [(k, v) for k, v in dfg_inst.apply(log, parameters=parameters).items() if v > 0]
-    sender_nodes = discover_in_nodes(log, dfg)
-    dfg.extend(sender_nodes)
-    #dfg = {}
-    #for index, trace in enumerate(log):
-    #    dfg[trace] = [(k, v) for k, v in dfg_inst.apply(trace, parameters=parameters).items() if v > 0]
-    #sender_nodes = discover_in_nodes(log, dfg)
-    #for key in sender_nodes.keys():
-    #    dfg[key].append(sender_nodes[key])
-    # might be redundant, but will help matching senders with receivers, currently not implemented
-    #receiver_nodes = discover_out_nodes(log, dfg)
-    #for x in receiver_nodes:
-    #    dfg[trace].append(x)
+    process_tree = []
+    for index, trace in enumerate(log):
+        sender_nodes_t = sender_nodes[index]
+        receiver_nodes_t = receiver_nodes[index]
+        dfg_t = dfg[index]
+        original_dfg_t = original_dfg[index]
+        log_t = trace
 
-    c = Counts()
-    activities = attributes_get.get_attribute_values(log, activity_key)
-    start_activities = list(start_activities_get.get_start_activities(log, parameters=parameters).keys())
-    end_activities = list(end_activities_get.get_end_activities(log, parameters=parameters).keys())
-    for x in sender_nodes:
-        activities[x[0][0]] = x[1]
-        start_activities.append(x[0][0])
+        c = Counts()
+        activities = attributes_get.get_attribute_values(log_t, activity_key)
+        start_activities = list(start_activities_get.get_start_activities(log_t, parameters=parameters).keys())
+        end_activities = list(end_activities_get.get_end_activities(log_t, parameters=parameters).keys())
+        for x in sender_nodes_t:
+            activities[x[0][0]] = x[1]
+            start_activities.append(x[0][0])
+        for x in receiver_nodes_t:
+            activities[x[0][1]] = x[1]
+            end_activities.append(x[0][1])
+        
+        contains_empty_traces = False
+        traces_length = [len(trace) for trace in log_t]
+        if traces_length:
+            contains_empty_traces = min([len(trace) for trace in log_t]) == 0
 
-    contains_empty_traces = False
-    traces_length = [len(trace) for trace in log]
-    if traces_length:
-        contains_empty_traces = min([len(trace) for trace in log]) == 0
+        # set the threshold parameter based on f and the max value in the dfg:
+        max_value = 0
+        for key, value in dfg_t:
+            if value > max_value:
+                max_value = value
+        threshold = noise_threshold * max_value
 
-    # set the threshold parameter based on f and the max value in the dfg:
-    max_value = 0
-    for key, value in dfg:
-        if value > max_value:
-            max_value = value
-    threshold = noise_threshold * max_value
+        recursion_depth = 0
 
-    recursion_depth = 0
+        sub = my_subtree_infrequent.my_make_tree(sender_nodes_t, receiver_nodes_t, log_t, original_dfg_t, dfg_t, activities, c, recursion_depth,
+                                                 noise_threshold, threshold,
+                                                 start_activities, end_activities, parameters=parameters)
 
-    sub = my_subtree_infrequent.my_make_tree(sender_nodes, log, dfg, dfg, dfg, activities, c, recursion_depth, noise_threshold, threshold,
-                            start_activities, end_activities,
-                            start_activities, end_activities, parameters=parameters)
+        process_tree.append(get_tree_repr_implain_get_repr(sub, 0, contains_empty_traces=contains_empty_traces))
+        remove_double_edges(process_tree[index])
+        # Ensures consistency to the parent pointers in the process tree
+        tree_consistency.fix_parent_pointers(process_tree[index])
+        # Fixes a 1 child XOR that is added when single-activities flowers are found
+        tree_consistency.fix_one_child_xor_flower(process_tree[index])
+        # folds the process tree (to simplify it in case fallthroughs/filtering is applied)
+        process_tree[index] = generic.fold(process_tree[index])
+        # sorts the process tree to ensure consistency in different executions of the algorithm
+        tree_sort(process_tree[index])
 
-    process_tree = get_tree_repr_implain_get_repr(sub, 0, contains_empty_traces=contains_empty_traces)
-    # Ensures consistency to the parent pointers in the process tree
-    tree_consistency.fix_parent_pointers(process_tree)
-    # Fixes a 1 child XOR that is added when single-activities flowers are found
-    tree_consistency.fix_one_child_xor_flower(process_tree)
-    # folds the process tree (to simplify it in case fallthroughs/filtering is applied)
-    process_tree = generic.fold(process_tree)
-    # sorts the process tree to ensure consistency in different executions of the algorithm
-    tree_sort(process_tree)
+        my_fix_root_xor_flower(process_tree[index])
 
     return process_tree
 
@@ -108,7 +190,7 @@ def get_tree_repr_implain_get_repr(spec_tree_struct, rec_depth, contains_empty_t
                                               xes_constants.DEFAULT_NAME_KEY)
 
     base_cases = ('empty_log', 'single_activity')
-    cut = ('concurrent', 'sequential', 'parallel', 'loopCut', 'receive_message_activity')
+    cut = ('concurrent', 'sequential', 'parallel', 'loopCut', 'receive_message_activity', 'send_message_activity')
     # note that the activity_once_per_trace is not included here, as it is can be dealt with as a parallel cut
     fall_throughs = ('empty_trace', 'strict_tau_loop', 'tau_loop', 'flower')
 
@@ -124,7 +206,9 @@ def get_tree_repr_implain_get_repr(spec_tree_struct, rec_depth, contains_empty_t
             final_tree_repr = ProcessTree(operator=Operator.PARALLEL)
         elif spec_tree_struct.detected_cut == "receive_message_activity":
             final_tree_repr = ProcessTree(operator=Operator.RECEIVE_MESSAGE)
-
+        elif spec_tree_struct.detected_cut == "send_message_activity":
+            final_tree_repr = ProcessTree(operator=Operator.SEND_MESSAGE)
+        
         if not (spec_tree_struct.detected_cut == "loopCut" and len(spec_tree_struct.children) >= 3):
             for ch in spec_tree_struct.children:
                 # get the representation of the current child (from children in the subtree-structure):
@@ -208,7 +292,7 @@ def get_tree_repr_implain_get_repr(spec_tree_struct, rec_depth, contains_empty_t
     return final_tree_repr
 
 
-def my_apply_im_f(log: list[EventLog], parameters):
+def my_apply_im_f(log: List[EventLog], parameters):
     from pm4py.objects.conversion.log import converter
     for index, trace in enumerate(log):
         log[index] = converter.apply(trace, parameters=parameters)

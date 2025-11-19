@@ -112,7 +112,24 @@ def my_recursively_add_tree(parent_tree, tree, bpmn, initial_event, final_event,
             bpmn.add_flow(BPMN.Flow(task, receive_message_task))
         initial_connector = receive_message_task
         final_connector = receive_message_task
-        pass
+    elif tree.operator == Operator.SEND_MESSAGE:
+        send_message_node = tree_childs[0]
+
+        bpmn, task, counts = pm4py.objects.conversion.process_tree.variants.to_bpmn.add_task(bpmn, counts, label=send_message_node.label)
+        bpmn.add_flow(BPMN.Flow(initial_event, task))
+        bpmn.add_flow(BPMN.Flow(task, final_event))
+        send_message_task = task
+        for child in tree_childs:
+            if child == send_message_node:
+                continue
+            # add task
+            task = BPMN.Task(name=child.label)
+            bpmn.add_node(task)
+
+            # add flow
+            bpmn.add_flow(BPMN.Flow(send_message_task, task))
+        initial_connector = send_message_task
+        final_connector = send_message_task
     return bpmn, counts, initial_connector, final_connector
 
 
